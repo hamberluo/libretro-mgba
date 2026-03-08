@@ -269,6 +269,8 @@ static bool _GBACoreInit(struct mCore* core) {
 #ifndef MINIMAL_CORE
 	gbacore->logContext = NULL;
 #endif
+	gbacore->nMemoryBlocks = 0;
+	gbacore->memoryBlockType = -2;
 
 	GBACreate(gba);
 	// TODO: Restore cheats
@@ -1139,6 +1141,8 @@ size_t _GBACoreListMemoryBlocks(const struct mCore* core, const struct mCoreMemo
 			}
 		}
 		gbacore->memoryBlockType = gba->memory.savedata.type;
+
+		mCALLBACKS_INVOKE(gba, memoryBlocksChanged);
 	}
 
 	*blocks = gbacore->memoryBlocks;
@@ -1261,8 +1265,21 @@ static bool _GBACoreWriteRegister(struct mCore* core, const char* name, const vo
 	case 'c':
 	case 'C':
 		if (strcmp(name, "cpsr") == 0) {
+			uint32_t pc = cpu->gprs[ARM_PC] & -WORD_SIZE_THUMB;
+			enum ExecutionMode mode = cpu->cpsr.t;
 			cpu->cpsr.packed = value & 0xF00000FF;
 			_ARMReadCPSR(cpu);
+			if (mode != cpu->cpsr.t) {
+				// Mode changed, flush the prefetch
+				if (cpu->cpsr.t == MODE_ARM) {
+					pc &= -WORD_SIZE_ARM;
+					LOAD_32(cpu->prefetch[0], (pc - WORD_SIZE_ARM) & cpu->memory.activeMask, cpu->memory.activeRegion);
+					LOAD_32(cpu->prefetch[1], pc & cpu->memory.activeMask, cpu->memory.activeRegion);
+				} else {
+					LOAD_16(cpu->prefetch[0], (pc - WORD_SIZE_THUMB) & cpu->memory.activeMask, cpu->memory.activeRegion);
+					LOAD_16(cpu->prefetch[1], pc & cpu->memory.activeMask, cpu->memory.activeRegion);
+				}
+			}
 			return true;
 		}
 		return false;
@@ -1368,7 +1385,7 @@ static void _GBACoreLoadSymbols(struct mCore* core, struct VFile* vf) {
 		seek = vf->seek(vf, 0, SEEK_CUR);
 		vf->seek(vf, 0, SEEK_SET);
 	}
-#if defined(ENABLE_VFS) && defined(ENABLE_DIRECTORIES)
+#if defined(ENABLE_VFS) && defined(ENABLE_DIRECTORIES) && !defined(__LIBRETRO__)
 #ifdef USE_ELF
 	if (!vf && core->dirs.base) {
 		closeAfter = true;
@@ -1722,7 +1739,7 @@ static void _GBAVLPStartFrameCallback(void *context) {
 		GBAVideoProxyRendererUnshim(&gba->video, &gbacore->vlProxy);
 		mVideoLogContextRewind(gbacore->logContext, core);
 		GBAVideoProxyRendererShim(&gba->video, &gbacore->vlProxy);
-		gba->earlyExit = true;
+		GBAInterrupt(gba);
 	}
 }
 

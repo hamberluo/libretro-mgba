@@ -303,7 +303,7 @@ void CoreController::loadConfig(ConfigController* config) {
 	m_autoload = config->getOption("autoload", true).toInt();
 	m_autofireThreshold = config->getOption("autofireThreshold", m_autofireThreshold).toInt();
 	m_fastForwardVolume = config->getOption("fastForwardVolume", -1).toInt();
-	m_fastForwardMute = config->getOption("fastForwardMute", -1).toInt();
+	m_fastForwardMute = config->getOption("fastForwardMute", false).toInt();
 	mCoreConfigCopyValue(&m_threadContext.core->config, config->config(), "volume");
 	mCoreConfigCopyValue(&m_threadContext.core->config, config->config(), "mute");
 	m_preload = config->getOption("preload", true).toInt();
@@ -640,7 +640,7 @@ void CoreController::overrideMute(bool override) {
 		core->opts.mute = true;
 	} else {
 		if (m_fastForward || m_fastForwardForced) {
-			core->opts.mute = m_fastForwardMute >= 0;
+			core->opts.mute = m_fastForwardMute;
 		} else {
 			mCoreConfigGetBoolValue(&core->config, "mute", &core->opts.mute);
 		}
@@ -824,7 +824,7 @@ void CoreController::loadSave(const QString& path, bool temporary) {
 	m_resetActions.append([this, path, temporary]() {
 		VFile* vf = VFileDevice::open(path, temporary ? O_RDONLY : O_RDWR);
 		if (!vf) {
-			qCritical() << tr("Failed to open save file: %1").arg(path);
+			LOG(QT, ERROR) << tr("Failed to open save file: %1").arg(path);
 			return;
 		}
 
@@ -882,7 +882,7 @@ void CoreController::loadPatch(const QString& patchPath) {
 void CoreController::replaceGame(const QString& path) {
 	QFileInfo info(path);
 	if (!info.isReadable()) {
-		qCritical() << tr("Failed to open game file: %1").arg(path);
+		LOG(QT, ERROR) << tr("Failed to open game file: %1").arg(path);
 		return;
 	}
 	QString fname = info.canonicalFilePath();
@@ -912,7 +912,7 @@ void CoreController::yankPak() {
 		break;
 #endif
 	case mPLATFORM_NONE:
-		qCritical() << tr("Can't yank pack in unexpected platform!");
+		LOG(QT, ERROR) << tr("Can't yank pack in unexpected platform!");
 		break;
 	}
 }
@@ -1027,7 +1027,7 @@ void CoreController::importSharkport(const QString& path) {
 	}
 	VFile* vf = VFileDevice::open(path, O_RDONLY);
 	if (!vf) {
-		qCritical() << tr("Failed to open snapshot file for reading: %1").arg(path);
+		LOG(QT, ERROR) << tr("Failed to open snapshot file for reading: %1").arg(path);
 		return;
 	}
 	Interrupter interrupter(this);
@@ -1044,7 +1044,7 @@ void CoreController::exportSharkport(const QString& path) {
 	}
 	VFile* vf = VFileDevice::open(path, O_WRONLY | O_CREAT | O_TRUNC);
 	if (!vf) {
-		qCritical() << tr("Failed to open snapshot file for writing: %1").arg(path);
+		LOG(QT, ERROR) << tr("Failed to open snapshot file for writing: %1").arg(path);
 		return;
 	}
 	Interrupter interrupter(this);
@@ -1306,9 +1306,7 @@ void CoreController::updateFastForward() {
 		if (m_fastForwardVolume >= 0) {
 			m_threadContext.core->opts.volume = m_fastForwardVolume;
 		}
-		if (m_fastForwardMute >= 0) {
-			m_threadContext.core->opts.mute = m_fastForwardMute || m_mute;
-		}
+		m_threadContext.core->opts.mute = m_fastForwardMute || m_mute;
 		setSync(false);
 
 		// If we aren't holding the fast forward button

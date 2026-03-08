@@ -19,7 +19,7 @@ static inline uint32_t popcount32(unsigned bits) {
 #endif
 
 static inline unsigned clz32(uint32_t bits) {
-#if (defined(__GNUC__) || __clang__) && !defined(PS2)
+#if defined(__GNUC__) || __clang__
 	if (!bits) {
 		return 32;
 	}

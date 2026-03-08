@@ -255,8 +255,9 @@ bool mCoreLoadSaveFile(struct mCore* core, const char* path, bool temporary) {
 		return core->loadSave(core, vf);
 	}
 }
+#endif
 
-#if defined(ENABLE_VFS) && defined(ENABLE_DIRECTORIES)
+#if defined(ENABLE_VFS) && defined(ENABLE_DIRECTORIES) && !defined(__LIBRETRO__)
 bool mCoreAutoloadSave(struct mCore* core) {
 	if (!core->dirs.save) {
 		return false;
@@ -311,7 +312,6 @@ bool mCoreAutoloadCheats(struct mCore* core) {
 	}
 	return success;
 }
-#endif
 
 bool mCoreSaveState(struct mCore* core, int slot, int flags) {
 	struct VFile* vf = mCoreGetState(core, slot, true);

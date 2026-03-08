@@ -719,6 +719,8 @@ static void _GBCoreReset(struct mCore* core) {
 		}
 	}
 
+	mCALLBACKS_INVOKE(gb, memoryBlocksChanged);
+
 	SM83Reset(core->cpu);
 
 	if (core->opts.skipBios) {
@@ -1140,7 +1142,7 @@ static void _GBCoreLoadSymbols(struct mCore* core, struct VFile* vf) {
 	if (!core->symbolTable) {
 		core->symbolTable = mDebuggerSymbolTableCreate();
 	}
-#if defined(ENABLE_VFS) && defined(ENABLE_DIRECTORIES)
+#if defined(ENABLE_VFS) && defined(ENABLE_DIRECTORIES) && !defined(__LIBRETRO__)
 	if (!vf && core->dirs.base) {
 		vf = mDirectorySetOpenSuffix(&core->dirs, core->dirs.base, ".sym", O_RDONLY);
 	}
@@ -1431,7 +1433,7 @@ static void _GBVLPStartFrameCallback(void *context) {
 		GBVideoProxyRendererUnshim(&gb->video, &gbcore->proxyRenderer);
 		mVideoLogContextRewind(gbcore->logContext, core);
 		GBVideoProxyRendererShim(&gb->video, &gbcore->proxyRenderer);
-		gb->earlyExit = true;
+		GBInterrupt(gb);
 	}
 }
 
@@ -1495,13 +1497,15 @@ static bool _GBVLPLoadState(struct mCore* core, const void* buffer) {
 	struct GB* gb = (struct GB*) core->board;
 	const struct GBSerializedState* state = buffer;
 
-	gb->timing.root = NULL;
 	gb->model = state->model;
 
 	gb->cpu->pc = GB_BASE_HRAM;
 	gb->cpu->memory.setActiveRegion(gb->cpu, gb->cpu->pc);
 
+	mTimingClear(&gb->timing);
 	GBVideoReset(&gb->video);
+	mTimingClear(&gb->timing);
+
 	GBVideoDeserialize(&gb->video, state);
 	GBIODeserialize(gb, state);
 	GBAudioReset(&gb->audio);

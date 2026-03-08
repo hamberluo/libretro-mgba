@@ -127,7 +127,6 @@ static bool updateAudioLatency;
 static bool updateAudioRate;
 static bool deferredSetup = false;
 static bool useBitmasks = true;
-static bool envVarsUpdated;
 static int32_t tiltX = 0;
 static int32_t tiltY = 0;
 static int32_t gyroZ = 0;

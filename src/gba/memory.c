@@ -360,13 +360,7 @@ static void GBASetActiveRegion(struct ARMCore* cpu, uint32_t address) {
 		cpu->memory.activeMask = 0;
 
 		if (!gba->yankedRomSize && mCoreCallbacksListSize(&gba->coreCallbacks)) {
-			size_t c;
-			for (c = 0; c < mCoreCallbacksListSize(&gba->coreCallbacks); ++c) {
-				struct mCoreCallbacks* callbacks = mCoreCallbacksListGetPointer(&gba->coreCallbacks, c);
-				if (callbacks->coreCrashed) {
-					callbacks->coreCrashed(callbacks->context);
-				}
-			}
+			mCALLBACKS_INVOKE(gba, coreCrashed);
 		}
 
 		if (gba->yankedRomSize || !gba->hardCrash) {
@@ -1807,7 +1801,7 @@ int32_t GBAMemoryStall(struct ARMCore* cpu, int32_t wait) {
 	int32_t loads = 1;
 
 	while (stall < wait && loads < maxLoads) {
-		stall += s + 1;
+		stall += s;
 		++loads;
 	}
 	memory->lastPrefetchedPc = cpu->gprs[ARM_PC] + WORD_SIZE_THUMB * (loads + previousLoads - 1);

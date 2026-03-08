@@ -5,17 +5,16 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include "LogController.h"
 
+#include <QLoggingCategory>
 #include <QMessageBox>
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-#include <QtLogging>
-#endif
+#include <QTextStream>
 
 #include "ConfigController.h"
 
 using namespace QGBA;
 
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
-#define endl Qt::endl
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+using Qt::endl;
 #endif
 
 LogController LogController::s_global(mLOG_ALL);
@@ -55,8 +54,9 @@ LogController::LogController(int levels, QObject* parent)
 	m_filter.defaultLevels = levels;
 	s_qtCat = mLogCategoryById("platform.qt");
 
-	if (this != &s_global) {
-		connect(&s_global, &LogController::logPosted, this, &LogController::postLog);
+	if (this == &s_global) {
+		setDefaultTarget(this);
+	} else {
 		connect(this, static_cast<void (LogController::*)(int)>(&LogController::levelsSet), &s_global, static_cast<void (LogController::*)(int)>(&LogController::setLevels));
 		connect(this, static_cast<void (LogController::*)(int)>(&LogController::levelsEnabled), &s_global, static_cast<void (LogController::*)(int)>(&LogController::enableLevels));
 		connect(this, static_cast<void (LogController::*)(int)>(&LogController::levelsDisabled), &s_global, static_cast<void (LogController::*)(int)>(&LogController::disableLevels));
@@ -69,10 +69,6 @@ LogController::~LogController() {
 
 int LogController::levels(int category) const {
 	return mLogFilterLevels(&m_filter, category);
-}
-
-LogController::Stream LogController::operator()(int category, int level) {
-	return Stream(this, category, level);
 }
 
 void LogController::load(const ConfigController* config) {
@@ -195,20 +191,4 @@ QString LogController::toString(int level) {
 		return tr("GAME ERROR");
 	}
 	return QString();
-}
-
-LogController::Stream::Stream(LogController* controller, int level, int category)
-	: m_level(level)
-	, m_category(category)
-	, m_log(controller)
-{
-}
-
-LogController::Stream::~Stream() {
-	m_log->postLog(m_level, m_category, m_queue.join(" "));
-}
-
-LogController::Stream& LogController::Stream::operator<<(const QString& string) {
-	m_queue.append(string);
-	return *this;
 }

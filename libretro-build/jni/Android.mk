@@ -15,9 +15,10 @@ endif
 
 include $(CLEAR_VARS)
 LOCAL_MODULE    := retro
-LOCAL_SRC_FILES := $(SOURCES_C) $(SOURCES_CXX)
-LOCAL_CPPFLAGS  := -O3 $(COREFLAGS)
-LOCAL_CFLAGS    := -O3 $(COREFLAGS)
-LOCAL_LDFLAGS   := -Wl,-version-script=$(CORE_DIR)/link.T
+# Convert CORE_DIR-relative paths to LOCAL_PATH-relative paths
+LOCAL_SRC_FILES := $(patsubst $(CORE_DIR)/%,../../%,$(SOURCES_C) $(SOURCES_CXX))
+LOCAL_CPPFLAGS  := -O3 -g $(COREFLAGS)
+LOCAL_CFLAGS    := -O3 -g $(COREFLAGS)
+LOCAL_LDFLAGS   := -Wl,-version-script=$(CORE_DIR)/link.T -Wl,-z,max-page-size=16384
 LOCAL_ARM_MODE  := arm
 include $(BUILD_SHARED_LIBRARY)

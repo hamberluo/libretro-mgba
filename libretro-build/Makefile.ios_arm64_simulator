@@ -1,0 +1,126 @@
+##############
+# iOS arm64 (模拟器 - Apple Silicon Mac) 构建配置
+# 要求: macOS 系统，已安装 Xcode
+# iOS 15.0+
+
+#########################
+# Check the host platform
+
+HOST_PLATFORM = darwin
+ifeq ($(shell uname -a),)
+  HOST_PLATFORM = windows
+else ifneq ($(findstring MINGW,$(shell uname -a)),)
+  HOST_PLATFORM = windows
+else ifneq ($(findstring Darwin,$(shell uname -a)),)
+  HOST_PLATFORM = darwin
+else ifneq ($(findstring win,$(shell uname -a)),)
+  HOST_PLATFORM = windows
+endif
+
+#########################
+# Set the target platform
+
+TARGET_PLATFORM = ios_arm64_simulator
+
+#################
+# Toolchain setup
+# 使用 Xcode 自带的工具链
+
+# 获取 iOS Simulator SDK 路径
+IOS_SIM_SDK := $(shell xcrun --sdk iphonesimulator --show-sdk-path 2>/dev/null)
+ifeq ($(IOS_SIM_SDK),)
+  $(error 错误: 找不到 iOS Simulator SDK，请确保已安装 Xcode)
+endif
+
+CC  = $(shell xcrun --sdk iphonesimulator --find clang)
+CXX = $(shell xcrun --sdk iphonesimulator --find clang++)
+AS  = $(shell xcrun --sdk iphonesimulator --find as)
+AR  = $(shell xcrun --sdk iphonesimulator --find ar)
+
+############
+# Extensions
+
+OBJEXT = .ios_arm64_simulator.o
+SOEXT  = .dylib
+LIBEXT = .ios_arm64_simulator.a
+
+# 输出目录
+OUTPUT_DIR = libs/ios-simulator-arm64
+
+################
+# Platform setup
+
+STATIC_LINKING = 0
+platform       = ios
+PLATDEFS       = -DIOS -DIOS_SIMULATOR -DHAVE_STRLCPY -DHAVE_STDINT_H -DHAVE_INTTYPES_H -DINLINE=inline -DBSPF_UNIX -DHAVE_LOCALE
+PLATCFLAGS     = -arch arm64 -mios-simulator-version-min=15.0 -isysroot $(IOS_SIM_SDK) -fpic -fstrict-aliasing -fvisibility=hidden
+PLATCXXFLAGS   = -arch arm64 -mios-simulator-version-min=15.0 -isysroot $(IOS_SIM_SDK) -fpic -fstrict-aliasing -fvisibility=hidden -fno-exceptions -fno-rtti
+PLATLDFLAGS    = -arch arm64 -mios-simulator-version-min=15.0 -isysroot $(IOS_SIM_SDK) -shared -lm -fvisibility=hidden
+PLATLDXFLAGS   = -arch arm64 -mios-simulator-version-min=15.0 -isysroot $(IOS_SIM_SDK) -shared -lm -fvisibility=hidden
+
+################
+# libretro setup
+
+RETRODEFS     = -D__LIBRETRO__
+RETROCFLAGS   =
+RETROCXXFLAGS =
+RETROLDFLAGS  =
+RETROLDXFLAGS =
+
+#################
+# Final variables
+
+DEFINES  = $(PLATDEFS) $(RETRODEFS)
+CFLAGS   = $(PLATCFLAGS) $(RETROCFLAGS) $(DEFINES) $(INCLUDES)
+CXXFLAGS = $(PLATCXXFLAGS) $(RETROCXXFLAGS) $(DEFINES) $(INCLUDES)
+LDFLAGS  = $(PLATLDFLAGS) $(RETROLDFLAGS)
+LDXFLAGS = $(PLATLDXFLAGS) $(RETROLDXFLAGS)
+
+########
+# Tuning
+
+ifneq ($(DEBUG),)
+  CFLAGS   += -O0 -g
+  CXXFLAGS += -O0 -g
+else
+  CFLAGS   += -O3 -DNDEBUG
+  CXXFLAGS += -O3 -DNDEBUG
+endif
+
+ifneq ($(LOG_PERFORMANCE),)
+  CFLAGS   += -DLOG_PERFORMANCE
+  CXXFLAGS += -DLOG_PERFORMANCE
+endif
+
+####################################
+# Variable setup for Makefile.common
+
+CORE_DIR  ?= ..
+BUILD_DIR ?= .
+INCLUDES   = -I$(IOS_SIM_SDK)/usr/include
+
+# 设置目标名称为 libretro
+TARGET_NAME = libretro
+
+include $(BUILD_DIR)/Makefile.common
+
+###############
+# Include rules
+
+include $(BUILD_DIR)/Makefile.rules
+
+# 定义最终输出目标
+FINAL_TARGET = $(OUTPUT_DIR)/libretro.dylib
+
+# 覆盖 all 目标，先构建默认目标，然后移动并重命名
+all: $(FINAL_TARGET)
+
+$(FINAL_TARGET): $(TARGET)
+	@mkdir -p $(OUTPUT_DIR)
+	@mv $(TARGET) $(FINAL_TARGET)
+	@echo "输出文件: $(FINAL_TARGET)"
+
+clean: clean-objs
+	rm -f $(TARGET)
+	rm -f $(FINAL_TARGET)
+

@@ -58,11 +58,7 @@ struct retro_core_option_v2_category option_cats_us[] = {
    {
       "video",
       "Video",
-#if defined(COLOR_16_BIT) && defined(COLOR_5_6_5)
-      "Configure DMG palette / SGB borders / color correction / LCD ghosting effects."
-#else
       "Configure DMG palette / SGB borders."
-#endif
    },
    {
       "audio",
@@ -173,41 +169,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "ON"
    },
-#if defined(COLOR_16_BIT) && defined(COLOR_5_6_5)
-   {
-      "mgba_color_correction",
-      "Color Correction",
-      NULL,
-      "Adjusts output colors to match the display of real GBA/GBC hardware.",
-      NULL,
-      "video",
-      {
-         { "OFF",  "disabled" },
-         { "GBA",  "Game Boy Advance" },
-         { "GBC",  "Game Boy Color" },
-         { "Auto", NULL },
-         { NULL, NULL },
-      },
-      "OFF"
-   },
-   {
-      "mgba_interframe_blending",
-      "Interframe Blending",
-      NULL,
-      "Simulates LCD ghosting effects. 'Simple' performs a 50:50 mix of the current and previous frames. 'Smart' attempts to detect screen flickering, and only performs a 50:50 mix on affected pixels. 'LCD Ghosting' mimics natural LCD response times by combining multiple buffered frames. 'Simple' or 'Smart' blending is required when playing games that aggressively exploit LCD ghosting for transparency effects (Wave Race, Chikyuu Kaihou Gun ZAS, F-Zero, the Boktai series...).",
-      NULL,
-      "video",
-      {
-         { "OFF",               "disabled" },
-         { "mix",               "Simple" },
-         { "mix_smart",         "Smart" },
-         { "lcd_ghosting",      "LCD Ghosting (Accurate)" },
-         { "lcd_ghosting_fast", "LCD Ghosting (Fast)" },
-         { NULL, NULL },
-      },
-      "OFF"
-   },
-#endif
    {
       "mgba_audio_low_pass_filter",
       "Audio Filter",
@@ -324,51 +285,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "mgba_frameskip",
       "Frameskip",
       NULL,
-      "Skip frames to avoid audio buffer under-run (crackling). Improves performance at the expense of visual smoothness. 'Auto' skips frames when advised by the frontend. 'Auto (Threshold)' utilises the 'Frameskip Threshold (%)' setting. 'Fixed Interval' utilises the 'Frameskip Interval' setting.",
-      NULL,
-      "performance",
-      {
-         { "disabled",       NULL },
-         { "auto",           "Auto" },
-         { "auto_threshold", "Auto (Threshold)" },
-         { "fixed_interval", "Fixed Interval" },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-   {
-      "mgba_frameskip_threshold",
-      "Frameskip Threshold (%)",
-      NULL,
-      "When 'Frameskip' is set to 'Auto (Threshold)', specifies the audio buffer occupancy threshold (percentage) below which frames will be skipped. Higher values reduce the risk of crackling by causing frames to be dropped more frequently.",
-      NULL,
-      "performance",
-      {
-         { "15", NULL },
-         { "18", NULL },
-         { "21", NULL },
-         { "24", NULL },
-         { "27", NULL },
-         { "30", NULL },
-         { "33", NULL },
-         { "36", NULL },
-         { "39", NULL },
-         { "42", NULL },
-         { "45", NULL },
-         { "48", NULL },
-         { "51", NULL },
-         { "54", NULL },
-         { "57", NULL },
-         { "60", NULL },
-         { NULL, NULL },
-      },
-      "33"
-   },
-   {
-      "mgba_frameskip_interval",
-      "Frameskip Interval",
-      NULL,
-      "When 'Frameskip' is set to 'Fixed Interval', the value set here is the number of frames omitted after a frame is rendered - i.e. '0' = 60fps, '1' = 30fps, '2' = 15fps, etc.",
+      "Skip frames to improve performance at the expense of visual smoothness. The value set here is the number of frames omitted after a frame is rendered - i.e. '0' = 60fps, '1' = 30fps, '2' = 15fps, etc.",
       NULL,
       "performance",
       {
@@ -422,14 +339,11 @@ struct retro_core_options_v2 *options_intl[RETRO_LANGUAGE_LAST] = {
    &options_ar,      /* RETRO_LANGUAGE_ARABIC */
    &options_el,      /* RETRO_LANGUAGE_GREEK */
    &options_tr,      /* RETRO_LANGUAGE_TURKISH */
-   &options_sk,      /* RETRO_LANGUAGE_SLOVAK */
+   &options_sv,      /* RETRO_LANGUAGE_SLOVAK */
    &options_fa,      /* RETRO_LANGUAGE_PERSIAN */
    &options_he,      /* RETRO_LANGUAGE_HEBREW */
    &options_ast,     /* RETRO_LANGUAGE_ASTURIAN */
    &options_fi,      /* RETRO_LANGUAGE_FINNISH */
-   &options_id,      /* RETRO_LANGUAGE_INDONESIAN */
-   &options_sv,      /* RETRO_LANGUAGE_SWEDISH */
-   &options_uk,      /* RETRO_LANGUAGE_UKRAINIAN */
 };
 #endif
 

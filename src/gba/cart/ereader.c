@@ -1107,6 +1107,10 @@ void EReaderScanFilterAnchors(struct EReaderScan* scan) {
 			areaMean += portion;
 		}
 	}
+	if (!EReaderAnchorListSize(&scan->anchors)) {
+		return;
+	}
+
 	areaMean /= EReaderAnchorListSize(&scan->anchors);
 	for (i = 0; i < EReaderAnchorListSize(&scan->anchors); ++i) {
 		struct EReaderAnchor* anchor = EReaderAnchorListGetPointer(&scan->anchors, i);
@@ -1118,6 +1122,9 @@ void EReaderScanFilterAnchors(struct EReaderScan* scan) {
 			--i;
 		}
 	}
+	if (!EReaderAnchorListSize(&scan->anchors)) {
+		return;
+	}
 
 	qsort(EReaderAnchorListGetPointer(&scan->anchors, 0), EReaderAnchorListSize(&scan->anchors), sizeof(struct EReaderAnchor), _compareAnchors);
 }
@@ -1127,7 +1134,7 @@ void EReaderScanConnectAnchors(struct EReaderScan* scan) {
 	for (i = 0; i < EReaderAnchorListSize(&scan->anchors); ++i) {
 		struct EReaderAnchor* anchor = EReaderAnchorListGetPointer(&scan->anchors, i);
 		float closest = scan->scale * 2.f;
-		float threshold;
+		float threshold = 1.25f * closest;
 		size_t j;
 		for (j = 0; j < EReaderAnchorListSize(&scan->anchors); ++j) {
 			if (i == j) {
@@ -1139,7 +1146,7 @@ void EReaderScanConnectAnchors(struct EReaderScan* scan) {
 			float distance = hypotf(dx, dy);
 			if (distance < closest) {
 				closest = distance;
-				threshold = 1.25 * closest;
+				threshold = 1.25f * closest;
 			}
 		}
 		if (closest >= scan->scale) {
@@ -1496,6 +1503,10 @@ bool EReaderScanCard(struct EReaderScan* scan) {
 	EReaderScanConnectAnchors(scan);
 	EReaderScanCreateBlocks(scan);
 	size_t blocks = EReaderBlockListSize(&scan->blocks);
+	if (!blocks) {
+		return false;
+	}
+
 	size_t i;
 	for (i = 0; i < blocks; ++i) {
 		EReaderScanDetectBlockThreshold(scan, i);

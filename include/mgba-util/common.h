@@ -17,7 +17,7 @@
 CXX_GUARD_START
 
 #ifdef _WIN32
-#ifdef _CRT_NONSTDC_NO_WARNINGS
+#ifndef _CRT_NONSTDC_NO_WARNINGS
 #define _CRT_NONSTDC_NO_WARNINGS
 #endif
 #ifndef WIN32_LEAN_AND_MEAN
@@ -70,9 +70,7 @@ typedef intptr_t ssize_t;
 #define lseek _lseek
 #define O_ACCMODE (O_RDONLY|O_WRONLY|O_RDWR)
 #else
-#if !defined(PS2)
 #include <strings.h>
-#endif
 #include <unistd.h>
 #include <sys/time.h>
 #endif
@@ -124,7 +122,7 @@ typedef intptr_t ssize_t;
 #define ATOMIC_STORE_PTR(DST, SRC) InterlockedExchangePointer(&DST, SRC)
 #define ATOMIC_LOAD_PTR(DST, SRC) DST = InterlockedCompareExchangePointer(&SRC, 0, 0)
 #else
-/* TODO */
+// TODO
 #define ATOMIC_STORE(DST, SRC) ((DST) = (SRC))
 #define ATOMIC_LOAD(DST, SRC) ((DST) = (SRC))
 #define ATOMIC_ADD(DST, OP) ((DST) += (OP))
