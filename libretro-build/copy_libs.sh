@@ -23,10 +23,15 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../go_gba" && pwd)"
 
 # 构建输出目录
 BUILD_DIR="$SCRIPT_DIR/libs"
+# 未 strip(带 debug_info)的产物目录，用于给 Crashlytics 做 native 符号化
+OBJ_DIR="$SCRIPT_DIR/obj/local"
 
 # Android 目标目录
 ANDROID_TARGET_DIR="$PROJECT_ROOT/android/app/src/main/jniLibs/arm64-v8a"
 ANDROID_SOURCE="$BUILD_DIR/arm64-v8a/libretro.so"
+# 未 strip 版本：固定放进 go_gba 仓库内，供 Crashlytics Gradle 插件读取
+ANDROID_SYMBOL_TARGET_DIR="$PROJECT_ROOT/android/app/src/main/symbols/arm64-v8a"
+ANDROID_SYMBOL_SOURCE="$OBJ_DIR/arm64-v8a/libretro.so"
 
 # iOS 目标目录
 IOS_XCFRAMEWORK_DIR="$PROJECT_ROOT/ios/Runner/libretro.xcframework"
@@ -72,8 +77,21 @@ copy_android() {
     
     copy_file "$ANDROID_SOURCE" \
               "$ANDROID_TARGET_DIR/libretro.so" \
-              "Android ARM64 库"
-    
+              "Android ARM64 库 (stripped, 用于打包)"
+
+    echo ""
+
+    # 同步未 strip 版本(带 debug_info)到 go_gba 仓库内 symbols 目录,
+    # 让 Crashlytics 上传任务能拿到 native 符号(BuildId 与 jniLibs 那份一致)。
+    if [ -f "$ANDROID_SYMBOL_SOURCE" ]; then
+        copy_file "$ANDROID_SYMBOL_SOURCE" \
+                  "$ANDROID_SYMBOL_TARGET_DIR/libretro.so" \
+                  "Android ARM64 符号库 (unstripped, 用于 Crashlytics)"
+    else
+        echo -e "${YELLOW}⚠️  跳过: 未找到未 strip 版本: $ANDROID_SYMBOL_SOURCE${NC}"
+        echo -e "${YELLOW}   提示: 请用 ndk-build 构建(脚本 build_android_arm64.sh),不要手动 strip${NC}"
+    fi
+
     echo ""
 }
 
