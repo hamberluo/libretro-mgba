@@ -120,7 +120,10 @@ $(FINAL_TARGET): $(TARGET)
 	@mv $(TARGET) $(FINAL_TARGET)
 	@echo "输出文件: $(FINAL_TARGET)"
 
-clean: clean-objs
-	rm -f $(TARGET)
+clean: clean-final
+
+clean-final:
 	rm -f $(FINAL_TARGET)
+
+.PHONY: clean-final
 
