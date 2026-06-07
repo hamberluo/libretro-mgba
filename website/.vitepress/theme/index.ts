@@ -1,6 +1,7 @@
 import DefaultTheme from 'vitepress/theme'
 import PipelineDemo from '../../components/PipelineDemo.vue'
 import ArmStepDemo from '../../components/ArmStepDemo.vue'
+import ThumbAddDemo from '../../components/ThumbAddDemo.vue'
 import type { Theme } from 'vitepress'
 
 export default {
@@ -8,5 +9,6 @@ export default {
   enhanceApp({ app }) {
     app.component('PipelineDemo', PipelineDemo)
     app.component('ArmStepDemo', ArmStepDemo)
+    app.component('ThumbAddDemo', ThumbAddDemo)
   },
 } satisfies Theme
