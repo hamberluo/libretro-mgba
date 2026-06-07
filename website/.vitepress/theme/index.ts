@@ -6,6 +6,7 @@ import MemoryMapDemo from '../../components/MemoryMapDemo.vue'
 import EventQueueDemo from '../../components/EventQueueDemo.vue'
 import DmaTransferDemo from '../../components/DmaTransferDemo.vue'
 import ScanlineDemo from '../../components/ScanlineDemo.vue'
+import SwiCallDemo from '../../components/SwiCallDemo.vue'
 import type { Theme } from 'vitepress'
 
 export default {
@@ -18,5 +19,6 @@ export default {
     app.component('EventQueueDemo', EventQueueDemo)
     app.component('DmaTransferDemo', DmaTransferDemo)
     app.component('ScanlineDemo', ScanlineDemo)
+    app.component('SwiCallDemo', SwiCallDemo)
   },
 } satisfies Theme
