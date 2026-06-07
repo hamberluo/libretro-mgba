@@ -114,7 +114,7 @@ void ARMRunLoop(struct ARMCore* cpu) {
 }
 ```
 
-> ↗ 源码：[`src/arm/arm.c#L229`](https://github.com/hamberluo/libretro-mgba/blob/master/src/arm/arm.c#L229)
+> ↗ 源码：[`src/arm/arm.c#L243`](https://github.com/hamberluo/libretro-mgba/blob/master/src/arm/arm.c#L243)
 
 注意循环条件 `cpu->cycles < cpu->nextEvent`：CPU 一条条执行指令、一路累加周期，**直到攒够周期、该轮到别的部件做事了**（比如 PPU 该画下一行、定时器该响），才停下来交给事件调度器。这正是序章那根「贯穿全场的时钟」如何指挥 CPU 的——我们会在第 5 集《时间的主宰》里专门讲这个调度器。
 
