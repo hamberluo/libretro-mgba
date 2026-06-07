@@ -17,6 +17,7 @@ export default defineConfig({
         text: '系列',
         items: [
           { text: '序章 · 一帧画面是怎么诞生的', link: '/guide/intro' },
+          { text: 'CPU · 软件怎么假装成一块 ARM7 芯片', link: '/guide/ep02-cpu' },
         ],
       },
     ],

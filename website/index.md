@@ -15,7 +15,9 @@ features:
   - title: 序章 · 一帧画面是怎么诞生的
     details: 全链路鸟瞰 —— 模拟器到底在模拟什么。【已上线，点上方「开始阅读」】
   - title: CPU · 软件怎么假装成一块 ARM7 芯片
-    details: 取指→解码→执行。难题：解码慢？查表法。【敬请期待】
+    details: 取指→解码→执行。难题：解码慢？查表法。
+    link: /guide/ep02-cpu
+    linkText: 开始阅读
   - title: 一条指令的执行 · Thumb 指令集实战
     details: 执行→写回。难题：周期从哪来。【敬请期待】
   - title: 内存不是数组 · MMIO 与地址映射
