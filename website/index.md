@@ -31,7 +31,9 @@ features:
     link: /guide/ep05-timing
     linkText: 开始阅读
   - title: DMA · 不打扰 CPU 的搬运工
-    details: 内存→显存的高速搬运。难题：DMA 凭什么抢总线。【敬请期待】
+    details: 内存→显存的高速搬运。难题：DMA 凭什么抢总线。
+    link: /guide/ep06-dma
+    linkText: 开始阅读
   - title: PPU · 扫描线是怎么画出来的
     details: 显存→像素。难题：软件渲染 vs 硬件。【敬请期待】
   - title: 没有真 BIOS，游戏怎么还能跑？
