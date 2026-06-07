@@ -124,6 +124,7 @@ function step() {
 }
 .presets button.on { background: #00d4aa; color: #0d1b2a; font-weight: 700; }
 .presets button:hover, .controls button:hover { background: rgba(0, 212, 170, 0.12); }
+.presets button.on:hover { background: #1ae0b8; color: #0d1b2a; }
 .cols { display: flex; gap: 1rem; }
 .code { flex: 3; min-width: 0; font-family: var(--vp-font-family-mono); font-size: 0.78rem; overflow-x: auto; }
 .line { padding: 0.22rem 0.5rem; border-radius: 6px; white-space: pre; color: var(--vp-c-text-2); transition: all 0.25s ease; }
