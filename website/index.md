@@ -27,7 +27,9 @@ features:
     link: /guide/ep04-memory
     linkText: 开始阅读
   - title: 时间的主宰 · 周期精确与事件调度
-    details: 贯穿全局的时钟。难题：怎么做到周期精确。【敬请期待】
+    details: 贯穿全局的时钟。难题：怎么做到周期精确。
+    link: /guide/ep05-timing
+    linkText: 开始阅读
   - title: DMA · 不打扰 CPU 的搬运工
     details: 内存→显存的高速搬运。难题：DMA 凭什么抢总线。【敬请期待】
   - title: PPU · 扫描线是怎么画出来的
