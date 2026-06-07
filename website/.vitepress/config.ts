@@ -18,6 +18,7 @@ export default defineConfig({
         items: [
           { text: '序章 · 一帧画面是怎么诞生的', link: '/guide/intro' },
           { text: 'CPU · 软件怎么假装成一块 ARM7 芯片', link: '/guide/ep02-cpu' },
+          { text: '一条指令的执行 · Thumb 指令集实战', link: '/guide/ep03-thumb' },
         ],
       },
     ],

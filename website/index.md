@@ -19,7 +19,9 @@ features:
     link: /guide/ep02-cpu
     linkText: 开始阅读
   - title: 一条指令的执行 · Thumb 指令集实战
-    details: 执行→写回。难题：周期从哪来。【敬请期待】
+    details: 执行→写回。难题：周期从哪来。
+    link: /guide/ep03-thumb
+    linkText: 开始阅读
   - title: 内存不是数组 · MMIO 与地址映射
     details: CPU 读写内存。难题：一次访存几个周期。【敬请期待】
   - title: 时间的主宰 · 周期精确与事件调度
