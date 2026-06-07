@@ -22,6 +22,7 @@ export default defineConfig({
           { text: '内存不是数组 · MMIO 与地址映射', link: '/guide/ep04-memory' },
           { text: '时间的主宰 · 周期精确与事件调度', link: '/guide/ep05-timing' },
           { text: 'DMA · 不打扰 CPU 的搬运工', link: '/guide/ep06-dma' },
+          { text: 'PPU · 扫描线是怎么画出来的', link: '/guide/ep07-ppu' },
         ],
       },
     ],
