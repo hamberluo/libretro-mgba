@@ -69,7 +69,7 @@ DEFINE_DATA_FORM_1_INSTRUCTION_THUMB(ADD3, THUMB_ADDITION(cpu->gprs[rd], cpu->gp
 - `DEFINE_INSTRUCTION_THUMB`：`src/arm/isa-thumb.c#L58`
 - `DEFINE_DATA_FORM_1_INSTRUCTION_THUMB`：`src/arm/isa-thumb.c#L112`
 - `ADD3`：`src/arm/isa-thumb.c#L119`
-- `THUMB_ADDITION_S`：`src/arm/isa-thumb.c#L13`
+- `THUMB_ADDITION_S`：`src/arm/isa-thumb.c#L14`
 
 ## 3. 交互组件：`ThumbAddDemo.vue`
 
@@ -111,7 +111,7 @@ DEFINE_DATA_FORM_1_INSTRUCTION_THUMB(ADD3, THUMB_ADDITION(cpu->gprs[rd], cpu->gp
 
 ## 7. 验收标准
 
-1. `ep03-thumb.md` 讲透宏模板 + ADD3 全过程 + 标志位闭环，含真实源码块 + 4 个 GitHub 跳转（isa-thumb.c#L58/L112/L119/L13）。
+1. `ep03-thumb.md` 讲透宏模板 + ADD3 全过程 + 标志位闭环，含真实源码块 + 4 个 GitHub 跳转（isa-thumb.c#L58/L112/L119/L14）。
 2. `<ThumbAddDemo />` 可选预设、单步，结果 + N/Z/C/V 标志位联动，标注教学示意。
 3. 首页第 3 集卡片可点进；sidebar 有第 3 集。
 4. build 通过无死链；线上可访问 `/guide/ep03-thumb`。
