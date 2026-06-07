@@ -58,6 +58,8 @@ cpu->cycles += currentCycles;                // 结尾：记账
 DEFINE_DATA_FORM_1_INSTRUCTION_THUMB(ADD3, THUMB_ADDITION(cpu->gprs[rd], cpu->gprs[rn], cpu->gprs[rm]))
 ```
 
+> ↗ 源码：[`src/arm/isa-thumb.c#L119`](https://github.com/hamberluo/libretro-mgba/blob/master/src/arm/isa-thumb.c#L119)
+
 `THUMB_ADDITION` 宏做两件事——相加，然后设置标志位：
 
 ```c
