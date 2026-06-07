@@ -23,7 +23,9 @@ features:
     link: /guide/ep03-thumb
     linkText: 开始阅读
   - title: 内存不是数组 · MMIO 与地址映射
-    details: CPU 读写内存。难题：一次访存几个周期。【敬请期待】
+    details: CPU 读写内存。难题：一次访存几个周期。
+    link: /guide/ep04-memory
+    linkText: 开始阅读
   - title: 时间的主宰 · 周期精确与事件调度
     details: 贯穿全局的时钟。难题：怎么做到周期精确。【敬请期待】
   - title: DMA · 不打扰 CPU 的搬运工
