@@ -125,14 +125,14 @@ function step() {
 .presets button.on { background: #00d4aa; color: #0d1b2a; font-weight: 700; }
 .presets button:hover, .controls button:hover { background: rgba(0, 212, 170, 0.12); }
 .cols { display: flex; gap: 1rem; }
-.code { flex: 2; font-family: var(--vp-font-family-mono); font-size: 0.78rem; }
+.code { flex: 3; min-width: 0; font-family: var(--vp-font-family-mono); font-size: 0.78rem; overflow-x: auto; }
 .line { padding: 0.22rem 0.5rem; border-radius: 6px; white-space: pre; color: var(--vp-c-text-2); transition: all 0.25s ease; }
-.line.active { background: rgba(0, 212, 170, 0.16); color: var(--vp-c-text-1); box-shadow: inset 3px 0 0 #00d4aa; }
-.state { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; font-family: var(--vp-font-family-mono); font-size: 0.85rem; }
-.srow { display: flex; justify-content: space-between; padding: 0.4rem 0.6rem; border: 1px solid var(--vp-c-divider); border-radius: 8px; transition: all 0.3s ease; }
-.srow.changed { border-color: #00d4aa; background: rgba(0, 212, 170, 0.12); }
-.srow .k { color: var(--vp-c-text-3); }
-.srow .v { color: #00d4aa; font-weight: 600; }
+.line.active { background: rgba(0, 212, 170, 0.14); color: var(--vp-c-text-1); box-shadow: inset 3px 0 0 #00d4aa; }
+.state { flex: 2; min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; font-family: var(--vp-font-family-mono); font-size: 0.85rem; }
+.srow { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; padding: 0.4rem 0.6rem; border: 1px solid var(--vp-c-divider); border-radius: 8px; transition: all 0.3s ease; }
+.srow.changed { border-color: #00d4aa; background: rgba(0, 212, 170, 0.14); }
+.srow .k { color: var(--vp-c-text-3); flex-shrink: 0; }
+.srow .v { color: #00d4aa; font-weight: 600; white-space: nowrap; }
 .flags { display: flex; gap: 0.5rem; }
 .flag { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; padding: 0.4rem; border: 1px solid var(--vp-c-divider); border-radius: 8px; transition: all 0.3s ease; }
 .flag.changed { border-color: #00d4aa; background: rgba(0, 212, 170, 0.12); }

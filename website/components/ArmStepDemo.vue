@@ -120,7 +120,7 @@ function reset() {
   transition: all 0.25s ease;
 }
 .line.active {
-  background: rgba(0, 212, 170, 0.16);
+  background: rgba(0, 212, 170, 0.14);
   color: var(--vp-c-text-1);
   box-shadow: inset 3px 0 0 #00d4aa;
 }

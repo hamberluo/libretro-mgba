@@ -82,6 +82,7 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 }
 .stage.active {
   border-color: #00d4aa;
+  background: rgba(0, 212, 170, 0.14);
   box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.2);
   transform: translateY(-4px);
 }
