@@ -72,7 +72,7 @@ const regionHex = computed(() => '0x' + curRegionNum.value.toString(16).toUpperC
 }
 .presets button.on { background: #00d4aa; color: #0d1b2a; font-weight: 700; }
 .presets button:hover { background: rgba(0, 212, 170, 0.12); }
-.presets button.on:hover { background: #1ae0b8; color: #0d1b2a; }
+.presets button.on:hover { background: #4af0d2; color: #0d1b2a; }
 .map { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 1rem; }
 .block {
   display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
