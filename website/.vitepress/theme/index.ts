@@ -3,6 +3,7 @@ import PipelineDemo from '../../components/PipelineDemo.vue'
 import ArmStepDemo from '../../components/ArmStepDemo.vue'
 import ThumbAddDemo from '../../components/ThumbAddDemo.vue'
 import MemoryMapDemo from '../../components/MemoryMapDemo.vue'
+import EventQueueDemo from '../../components/EventQueueDemo.vue'
 import type { Theme } from 'vitepress'
 
 export default {
@@ -12,5 +13,6 @@ export default {
     app.component('ArmStepDemo', ArmStepDemo)
     app.component('ThumbAddDemo', ThumbAddDemo)
     app.component('MemoryMapDemo', MemoryMapDemo)
+    app.component('EventQueueDemo', EventQueueDemo)
   },
 } satisfies Theme
