@@ -21,6 +21,7 @@ export default defineConfig({
           { text: '一条指令的执行 · Thumb 指令集实战', link: '/guide/ep03-thumb' },
           { text: '内存不是数组 · MMIO 与地址映射', link: '/guide/ep04-memory' },
           { text: '时间的主宰 · 周期精确与事件调度', link: '/guide/ep05-timing' },
+          { text: 'DMA · 不打扰 CPU 的搬运工', link: '/guide/ep06-dma' },
         ],
       },
     ],
