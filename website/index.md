@@ -39,7 +39,9 @@ features:
     link: /guide/ep07-ppu
     linkText: 开始阅读
   - title: 没有真 BIOS，游戏怎么还能跑？
-    details: 启动与系统调用。难题：HLE 高级模拟。【敬请期待】
+    details: 启动与系统调用。难题：HLE 高级模拟。
+    link: /guide/ep08-bios
+    linkText: 开始阅读
   - title: 声音 · 4+2 个声道如何合成一帧音频
     details: 像素之外的另一条线。难题：音视频同步。【敬请期待】
   - title: 随时存档读档 · 把整台机器冻在一瞬间

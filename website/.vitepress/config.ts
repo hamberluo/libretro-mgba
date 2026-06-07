@@ -23,6 +23,7 @@ export default defineConfig({
           { text: '时间的主宰 · 周期精确与事件调度', link: '/guide/ep05-timing' },
           { text: 'DMA · 不打扰 CPU 的搬运工', link: '/guide/ep06-dma' },
           { text: 'PPU · 扫描线是怎么画出来的', link: '/guide/ep07-ppu' },
+          { text: '没有真 BIOS，游戏怎么还能跑？', link: '/guide/ep08-bios' },
         ],
       },
     ],
