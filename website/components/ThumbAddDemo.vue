@@ -136,7 +136,7 @@ function step() {
 .srow .v { color: #00d4aa; font-weight: 600; white-space: nowrap; }
 .flags { display: flex; gap: 0.5rem; }
 .flag { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; padding: 0.4rem; border: 1px solid var(--vp-c-divider); border-radius: 8px; transition: all 0.3s ease; }
-.flag.changed { border-color: #00d4aa; background: rgba(0, 212, 170, 0.12); }
+.flag.changed { border-color: #00d4aa; background: rgba(0, 212, 170, 0.14); }
 .flag span { color: var(--vp-c-text-3); font-size: 0.75rem; }
 .flag b { color: #00d4aa; font-size: 1.1rem; }
 .controls { display: flex; gap: 0.6rem; margin-top: 1rem; }

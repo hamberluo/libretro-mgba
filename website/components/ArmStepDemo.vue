@@ -145,7 +145,7 @@ function reset() {
 }
 .srow.changed {
   border-color: #00d4aa;
-  background: rgba(0, 212, 170, 0.12);
+  background: rgba(0, 212, 170, 0.14);
 }
 .srow .k { color: var(--vp-c-text-3); flex-shrink: 0; }
 .srow .v { color: #00d4aa; font-weight: 600; white-space: nowrap; }
