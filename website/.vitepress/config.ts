@@ -4,7 +4,7 @@ export default defineConfig({
   title: 'GBA 模拟器内核精讲',
   description: '基于 mGBA 源码，深入浅出讲解 GBA 模拟器内核',
   lang: 'zh-CN',
-  base: '/libretro-mgba/',
+  base: '/',
   cleanUrls: true,
   appearance: 'dark',
   themeConfig: {

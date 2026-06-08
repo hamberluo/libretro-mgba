@@ -1,13 +1,13 @@
 # GBA 内核精讲文档站
 
-VitePress 静态文档站，部署在 https://hamberluo.github.io/libretro-mgba/
+VitePress 静态文档站，部署在 https://core.gogba.xyz/ （自定义域名，base 为 `/`）。
 
 ## 本地开发
 
 ```bash
 cd website
 npm install
-npm run docs:dev      # 本地预览 http://localhost:5173/libretro-mgba/
+npm run docs:dev      # 本地预览 http://localhost:5173/
 npm run docs:build    # 构建到 .vitepress/dist
 ```
 
