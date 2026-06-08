@@ -49,12 +49,21 @@ function seek(e) {
   const ratio = (e.clientX - rect.left) / rect.width
   a.currentTime = ratio * dur.value
 }
+const RATE_KEY = 'gba-listen-rate'
+
 function cycleRate() {
   rateIdx.value = (rateIdx.value + 1) % rates.length
   if (audio.value) audio.value.playbackRate = rate.value
+  try { localStorage.setItem(RATE_KEY, String(rate.value)) } catch (e) {}
 }
 
 onMounted(() => {
+  // 恢复全局倍速偏好（仅客户端，SSR 不读 localStorage）
+  try {
+    const saved = parseFloat(localStorage.getItem(RATE_KEY))
+    const i = rates.indexOf(saved)
+    if (i >= 0) rateIdx.value = i
+  } catch (e) {}
   if (audio.value) audio.value.playbackRate = rate.value
   if (rootEl.value && typeof IntersectionObserver !== 'undefined') {
     io = new IntersectionObserver(([e]) => { inView.value = e.isIntersecting }, { threshold: 0 })
