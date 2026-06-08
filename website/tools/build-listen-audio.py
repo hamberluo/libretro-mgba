@@ -28,7 +28,11 @@ def clean(md):
         if not s.strip():
             out.append("")
             continue
-        if re.match(r"^\s*<[A-Z][A-Za-z]+\s*/?>", s):
+        # AudioPlayer 是页面播放器控件，不是讲解内容，整行删除（别念出 src 文件名）
+        if re.match(r"^\s*<AudioPlayer\b", s):
+            continue
+        # 其它交互演示组件标签（可能带属性）→ 转提示语
+        if re.match(r"^\s*<[A-Z][A-Za-z]+\b[^>]*/?>", s):
             out.append("这里有一个交互演示，可以在网页上动手试试。")
             continue
         if "↗" in s and s.lstrip().startswith(">"):
