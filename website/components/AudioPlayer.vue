@@ -7,6 +7,10 @@ const props = defineProps({ src: { type: String, required: true } })
 const { site } = useData()
 
 const audio = ref(null)
+const rootEl = ref(null)
+const inView = ref(true)
+let io = null
+const started = ref(false)
 const playing = ref(false)
 const cur = ref(0)
 const dur = ref(0)
@@ -27,11 +31,12 @@ function fmt(t) {
   return m + ':' + String(s).padStart(2, '0')
 }
 const progress = computed(() => dur.value ? (cur.value / dur.value) * 100 : 0)
+const showMini = computed(() => started.value && !inView.value)
 
 function toggle() {
   const a = audio.value
   if (!a) return
-  if (a.paused) { a.play(); playing.value = true }
+  if (a.paused) { a.play(); playing.value = true; started.value = true }
   else { a.pause(); playing.value = false }
 }
 function onTime() { cur.value = audio.value.currentTime }
@@ -49,12 +54,21 @@ function cycleRate() {
   if (audio.value) audio.value.playbackRate = rate.value
 }
 
-onMounted(() => { if (audio.value) audio.value.playbackRate = rate.value })
-onUnmounted(() => { if (audio.value) audio.value.pause() })
+onMounted(() => {
+  if (audio.value) audio.value.playbackRate = rate.value
+  if (rootEl.value && typeof IntersectionObserver !== 'undefined') {
+    io = new IntersectionObserver(([e]) => { inView.value = e.isIntersecting }, { threshold: 0 })
+    io.observe(rootEl.value)
+  }
+})
+onUnmounted(() => {
+  if (audio.value) audio.value.pause()
+  if (io) io.disconnect()
+})
 </script>
 
 <template>
-  <div class="ap">
+  <div class="ap" ref="rootEl">
     <audio
       ref="audio"
       :src="resolvedSrc"
@@ -73,6 +87,19 @@ onUnmounted(() => { if (audio.value) audio.value.pause() })
     <span class="time">{{ fmt(cur) }} / {{ fmt(dur) }}</span>
     <button class="rate" @click="cycleRate">{{ rate }}×</button>
   </div>
+
+  <Teleport to="body">
+    <Transition name="mini-fade">
+      <div class="ap-mini" v-if="showMini">
+        <button class="play" @click="toggle" :aria-label="playing ? '暂停' : '播放'">
+          <span v-if="!playing">▶</span><span v-else>❚❚</span>
+        </button>
+        <span class="mlabel">听书</span>
+        <div class="bar" @click="seek"><div class="fill" :style="{ width: progress + '%' }"></div></div>
+        <span class="time">{{ fmt(cur) }}</span>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -96,4 +123,24 @@ onUnmounted(() => { if (audio.value) audio.value.pause() })
 @media (max-width: 640px) {
   .label { display: none; }
 }
+.ap-mini {
+  position: fixed; right: 1.2rem; bottom: 1.2rem; z-index: 100;
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0.8rem; width: min(320px, 80vw);
+  border: 1px solid #00d4aa; border-radius: 12px;
+  background: var(--vp-c-bg-elv, var(--vp-c-bg-soft));
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+}
+.ap-mini .play {
+  width: 2rem; height: 2rem; font-size: 0.8rem; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid #00d4aa; background: transparent; color: #00d4aa; border-radius: 8px; cursor: pointer;
+}
+.ap-mini .play:hover { background: rgba(0,212,170,0.12); }
+.ap-mini .mlabel { flex-shrink: 0; font-size: 0.85rem; color: var(--vp-c-text-2); white-space: nowrap; }
+.ap-mini .bar { flex: 1; min-width: 40px; height: 6px; background: var(--vp-c-bg); border-radius: 3px; cursor: pointer; overflow: hidden; }
+.ap-mini .fill { height: 100%; background: #00d4aa; border-radius: 3px; }
+.ap-mini .time { flex-shrink: 0; font-size: 0.78rem; color: var(--vp-c-text-3); font-family: var(--vp-font-family-mono); white-space: nowrap; }
+.mini-fade-enter-active, .mini-fade-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
+.mini-fade-enter-from, .mini-fade-leave-to { opacity: 0; transform: translateY(10px); }
 </style>
