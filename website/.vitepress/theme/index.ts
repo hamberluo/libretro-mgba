@@ -9,6 +9,7 @@ import ScanlineDemo from '../../components/ScanlineDemo.vue'
 import SwiCallDemo from '../../components/SwiCallDemo.vue'
 import MixerDemo from '../../components/MixerDemo.vue'
 import SaveStateDemo from '../../components/SaveStateDemo.vue'
+import AudioPlayer from '../../components/AudioPlayer.vue'
 import type { Theme } from 'vitepress'
 
 export default {
@@ -24,5 +25,6 @@ export default {
     app.component('SwiCallDemo', SwiCallDemo)
     app.component('MixerDemo', MixerDemo)
     app.component('SaveStateDemo', SaveStateDemo)
+    app.component('AudioPlayer', AudioPlayer)
   },
 } satisfies Theme
