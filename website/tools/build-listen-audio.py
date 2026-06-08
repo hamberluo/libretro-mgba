@@ -60,6 +60,26 @@ def clean(md):
         text = text.replace(ph, ph.replace("行", "航"))
     text = re.sub(r"(\d+)\s*行", r"\1 航", text)
     text = text.replace("几行", "几航")
+
+    # 代码标识符读法修正：把拼口的变量/缩合词换成中文或可读形式（朗读用，正文不变）。
+    # 字母缩写 CPU/DMA/PPU/BIOS 等保持逐字母念，不在此表。长词在前避免子串误伤。
+    term_read = [
+        ("waitstatesNonseq32", "等待周期表"),
+        ("masterCycles", "主时钟周期"),
+        ("currentCycles", "当前周期"),
+        ("nextEvent", "下一个事件"),
+        ("prefetch", "预取队列"),
+        ("opcode", "操作码"),
+        ("vcount", "行计数器"),
+        ("waitstate", "等待周期"),
+        ("cpsr", "状态寄存器"),
+        ("gprs", "寄存器组"),
+        ("VBlank", "V Blank"),
+        ("HBlank", "H Blank"),
+        ("mGBA", "m GBA"),
+    ]
+    for en, zh in term_read:
+        text = text.replace(en, zh)
     return text.strip()
 
 
