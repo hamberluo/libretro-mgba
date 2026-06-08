@@ -1,5 +1,7 @@
 # 一条指令的执行 · Thumb 指令集实战
 
+<AudioPlayer src="audio/ep03-thumb.mp3" />
+
 上一集，CPU 解码的终点是 `instruction(cpu, opcode)`——调用一个函数。这一集，我们打开这个函数，看一条指令到底怎么改变 CPU 的状态，以及它消耗的**周期究竟从哪里来**。
 
 GBA 游戏的代码绝大多数跑在 **Thumb 模式**：16 位一条指令，比 32 位的 ARM 指令更省空间。我们就从 Thumb 看起。

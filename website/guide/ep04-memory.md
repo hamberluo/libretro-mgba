@@ -1,5 +1,7 @@
 # 内存不是数组 · MMIO 与地址映射
 
+<AudioPlayer src="audio/ep04-memory.mp3" />
+
 上一集结尾，访存指令把额外的周期写进了 `currentCycles`：
 
 ```c
