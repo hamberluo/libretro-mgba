@@ -8,6 +8,7 @@ import DmaTransferDemo from '../../components/DmaTransferDemo.vue'
 import ScanlineDemo from '../../components/ScanlineDemo.vue'
 import SwiCallDemo from '../../components/SwiCallDemo.vue'
 import MixerDemo from '../../components/MixerDemo.vue'
+import SaveStateDemo from '../../components/SaveStateDemo.vue'
 import type { Theme } from 'vitepress'
 
 export default {
@@ -22,5 +23,6 @@ export default {
     app.component('ScanlineDemo', ScanlineDemo)
     app.component('SwiCallDemo', SwiCallDemo)
     app.component('MixerDemo', MixerDemo)
+    app.component('SaveStateDemo', SaveStateDemo)
   },
 } satisfies Theme

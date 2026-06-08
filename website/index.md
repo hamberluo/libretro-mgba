@@ -47,5 +47,7 @@ features:
     link: /guide/ep09-audio
     linkText: 开始阅读
   - title: 随时存档读档 · 把整台机器冻在一瞬间
-    details: 状态快照。难题：状态序列化的坑。【敬请期待】
+    details: 状态快照。难题：状态序列化的坑。
+    link: /guide/ep10-savestate
+    linkText: 开始阅读
 ---

@@ -25,6 +25,7 @@ export default defineConfig({
           { text: 'PPU · 扫描线是怎么画出来的', link: '/guide/ep07-ppu' },
           { text: '没有真 BIOS，游戏怎么还能跑？', link: '/guide/ep08-bios' },
           { text: '声音 · 4+2 个声道如何合成一帧音频', link: '/guide/ep09-audio' },
+          { text: '随时存档读档 · 把整台机器冻在一瞬间', link: '/guide/ep10-savestate' },
         ],
       },
     ],
