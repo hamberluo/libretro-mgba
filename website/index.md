@@ -43,7 +43,9 @@ features:
     link: /guide/ep08-bios
     linkText: 开始阅读
   - title: 声音 · 4+2 个声道如何合成一帧音频
-    details: 像素之外的另一条线。难题：音视频同步。【敬请期待】
+    details: 像素之外的另一条线。难题：音视频同步。
+    link: /guide/ep09-audio
+    linkText: 开始阅读
   - title: 随时存档读档 · 把整台机器冻在一瞬间
     details: 状态快照。难题：状态序列化的坑。【敬请期待】
 ---
