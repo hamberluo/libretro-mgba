@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { withBase } from 'vitepress'
+import { useData } from 'vitepress'
 
 const props = defineProps({ src: { type: String, required: true } })
+
+const { site } = useData()
 
 const audio = ref(null)
 const playing = ref(false)
@@ -12,7 +14,11 @@ const rates = [1, 1.25, 1.5, 0.75]
 const rateIdx = ref(0)
 const rate = computed(() => rates[rateIdx.value])
 
-const resolvedSrc = computed(() => withBase(props.src))
+const resolvedSrc = computed(() => {
+  const base = site.value.base || '/'          // 如 /libretro-mgba/
+  const rel = props.src.replace(/^\//, '')      // 去掉 src 前导斜杠
+  return base.replace(/\/$/, '') + '/' + rel    // 拼成 /libretro-mgba/audio/x.mp3
+})
 
 function fmt(t) {
   if (!t || isNaN(t)) return '0:00'
