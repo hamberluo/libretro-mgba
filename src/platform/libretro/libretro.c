@@ -2280,6 +2280,33 @@ bool retro_load_game_special(unsigned game_type, const struct retro_game_info* i
 	return false;
 }
 
+#ifdef M_CORE_GB
+// Size of the MBC RTC state mGBA appends after the SRAM in the savedata buffer.
+// Must mirror the mbcType dispatch in GBMBCInit (GB_MBC3_RTC / GB_HuC3 / GB_TAMA5),
+// and the corresponding *SaveBuffer structs, so the reported size matches the bytes
+// actually written by _GBMBCAppendSaveSuffix.
+static size_t _GBSaveRTCSuffixSize(struct mCore* core) {
+	if (core->platform(core) != mPLATFORM_GB) {
+		return 0;
+	}
+	switch (((struct GB*) core->board)->memory.mbcType) {
+	case GB_MBC3_RTC:
+		return sizeof(struct GBMBCRTCSaveBuffer);
+	case GB_HuC3:
+		return sizeof(struct GBMBCHuC3SaveBuffer);
+	case GB_TAMA5:
+		return sizeof(struct GBMBCTAMA5SaveBuffer);
+	default:
+		return 0;
+	}
+}
+#else
+static size_t _GBSaveRTCSuffixSize(struct mCore* core) {
+	UNUSED(core);
+	return 0;
+}
+#endif
+
 void* retro_get_memory_data(unsigned id) {
 	switch (id) {
 	case RETRO_MEMORY_SAVE_RAM:
@@ -2288,12 +2315,10 @@ void* retro_get_memory_data(unsigned id) {
 		switch (core->platform(core)) {
 #ifdef M_CORE_GB
 		case mPLATFORM_GB:
-			switch (((struct GB*) core->board)->memory.mbcType) {
-			case GB_MBC3_RTC:
+			if (_GBSaveRTCSuffixSize(core)) {
 				return &((uint8_t*) savedata)[((struct GB*) core->board)->sramSize];
-			default:
-				break;
 			}
+			break;
 #endif
 		default:
 			break;
@@ -2347,27 +2372,23 @@ size_t retro_get_memory_size(unsigned id) {
 #endif
 #ifdef M_CORE_GB
 		case mPLATFORM_GB:
-			return ((struct GB*) core->board)->sramSize;
+			// mGBA appends MBC RTC state directly after the SRAM in the savedata
+			// buffer (see _GBMBCAppendSaveSuffix). Report that trailing region as
+			// part of SAVE_RAM so frontends that only persist SAVE_RAM (e.g. go_gba)
+			// write it to disk; otherwise the RTC is silently truncated and games
+			// like Pokémon Crystal/Prism lose the clock on every reload.
+			return ((struct GB*) core->board)->sramSize + _GBSaveRTCSuffixSize(core);
 #endif
 		default:
 			break;
 		}
 		break;
 	case RETRO_MEMORY_RTC:
-		switch (core->platform(core)) {
 #ifdef M_CORE_GB
-		case mPLATFORM_GB:
-			switch (((struct GB*) core->board)->memory.mbcType) {
-			case GB_MBC3_RTC:
-				return sizeof(struct GBMBCRTCSaveBuffer);
-			default:
-				break;
-			}
-#endif
-		default:
-			break;
-		}
+		return _GBSaveRTCSuffixSize(core);
+#else
 		break;
+#endif
 	case RETRO_MEMORY_SYSTEM_RAM:
 		return GB_SIZE_WORKING_RAM;
 	case RETRO_MEMORY_VIDEO_RAM:
