@@ -84,6 +84,7 @@ static int32_t _readTiltX(struct mRotationSource* source);
 static int32_t _readTiltY(struct mRotationSource* source);
 static int32_t _readGyroZ(struct mRotationSource* source);
 static void _setupMaps(struct mCore* core);
+static size_t _GBSaveRTCSuffixSize(struct mCore* core);
 
 static struct mCore* core;
 static mColor* outputBuffer = NULL;
@@ -94,6 +95,7 @@ static size_t audioSampleBufferSize;
 static void* data;
 static size_t dataSize;
 static void* savedata;
+static size_t savedataSize;
 static struct mAVStream stream;
 static bool sensorsInitDone;
 static bool rumbleInitDone;
@@ -1272,7 +1274,12 @@ static void _doDeferredSetup(void) {
 	// On the off-hand chance that a core actually expects its buffers to be populated when
 	// you actually first get them, you're out of luck without workarounds. Yup, seriously.
 	// Here's that workaround, but really the API needs to be thrown out and rewritten.
-	struct VFile* save = VFileFromMemory(savedata, GBA_SIZE_FLASH1M);
+	/* savedataSize was sized in retro_load_game to the buffer actually allocated:
+	 * GBA_SIZE_FLASH1M for GBA (its flash autodetect keys off this VFile size)
+	 * and sramSize (+RTC suffix) for GB, which is large enough for GBResizeSram()
+	 * to map in-bounds -- including MBC6's concatenated 1MB flash -- instead of
+	 * growing the fixed buffer and running memset() off the end. */
+	struct VFile* save = VFileFromMemory(savedata, savedataSize);
 
     /* need to defer resetting the core on start so drivers are initialized */
     core->reset(core);
@@ -2080,12 +2087,32 @@ bool retro_load_game(const struct retro_game_info* game) {
 	core->setPeripheral(core, mPERIPH_RUMBLE, &rumble);
 	core->setPeripheral(core, mPERIPH_ROTATION, &rotation);
 
-	savedata = anonymousMemoryMap(GBA_SIZE_FLASH1M);
-	memset(savedata, 0xFF, GBA_SIZE_FLASH1M);
-
 	_reloadSettings();
 	core->loadROM(core, rom);
 	deferredSetup = true;
+
+	/* Allocate the savedata buffer only as large as this ROM actually needs,
+	 * rather than always reserving the MBC6 worst case (SRAM + 1MB flash =
+	 * 1.1MB). loadROM has finalized sramSize by now and it never grows past this
+	 * point (GBMBCInit derives it from the ROM header), so this is the lifetime
+	 * maximum. GBA stays at GBA_SIZE_FLASH1M: its type may still be AUTODETECT
+	 * here and that is the largest GBA save anyway. The buffer must already fit
+	 * before retro_load_game returns -- the frontend writes up to
+	 * retro_get_memory_size() bytes into it before the first retro_run().
+	 * Note: MBC6 ends up with savedataSize == sramSize exactly, which depends on
+	 * VFileFromMemory's map() accepting size == bufferSize (see _vfmMap in
+	 * src/util/vfs/vfs-mem.c); do not shrink that buffer below sramSize. */
+	savedataSize = GBA_SIZE_FLASH1M;
+#ifdef M_CORE_GB
+	if (core->platform(core) == mPLATFORM_GB) {
+		size_t needed = ((struct GB*) core->board)->sramSize + _GBSaveRTCSuffixSize(core);
+		if (needed > savedataSize) {
+			savedataSize = needed;
+		}
+	}
+#endif
+	savedata = anonymousMemoryMap(savedataSize);
+	memset(savedata, 0xFF, savedataSize);
 
 	const char* sysDir = 0;
 	const char* biosName = 0;
@@ -2157,7 +2184,7 @@ void retro_unload_game(void) {
 	core->deinit(core);
 	mappedMemoryFree(data, dataSize);
 	data = 0;
-	mappedMemoryFree(savedata, GBA_SIZE_FLASH1M);
+	mappedMemoryFree(savedata, savedataSize);
 	savedata = 0;
 }
 

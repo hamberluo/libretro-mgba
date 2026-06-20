@@ -311,7 +311,13 @@ void GBResizeSram(struct GB* gb, size_t size) {
 				}
 				if (size) {
 					gb->memory.sram = vf->map(vf, size, MAP_WRITE);
-					memset(&gb->memory.sram[vfSize], 0xFF, size - vfSize);
+					// map() can fail (returns NULL) when the backing VFile is
+					// too small to grow -- e.g. a fixed-size VFileFromMemory whose
+					// buffer is smaller than sramSize. Guard the memset so we
+					// degrade to a missing save instead of dereferencing NULL.
+					if (gb->memory.sram) {
+						memset(&gb->memory.sram[vfSize], 0xFF, size - vfSize);
+					}
 				}
 			} else if (size > gb->sramSize || !gb->memory.sram) {
 				// We aren't growing the file, but we are changing our mapping of it

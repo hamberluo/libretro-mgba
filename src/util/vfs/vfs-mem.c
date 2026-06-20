@@ -274,6 +274,11 @@ void* _vfmMap(struct VFile* vf, size_t size, int flags) {
 	struct VFileMem* vfm = (struct VFileMem*) vf;
 
 	UNUSED(flags);
+	// Must stay strictly '>': a map of exactly vfm->size has to succeed.
+	// The libretro core sizes its savedata buffer to exactly sramSize and
+	// relies on map(size == bufferSize) returning a valid pointer (see
+	// retro_load_game in src/platform/libretro/libretro.c). Changing this to
+	// '>=' would make GBResizeSram() get a NULL mapping and lose the save.
 	if (size > vfm->size) {
 		return 0;
 	}
