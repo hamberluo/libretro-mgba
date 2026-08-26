@@ -5,8 +5,7 @@ mGBA is an emulator for running Game Boy Advance games. It aims to be faster and
 
 Up-to-date news and downloads can be found at [mgba.io](https://mgba.io/).
 
-[![Build status](https://buildbot.mgba.io/badges/build-win32.svg)](https://buildbot.mgba.io)
-[![Translation status](https://hosted.weblate.org/widgets/mgba/-/svg-badge.svg)](https://hosted.weblate.org/engage/mgba)
+**Note:** This is a fork of [libretro/mgba](https://github.com/libretro/mgba), maintained for the [GoGBA](https://core.gogba.xyz) project. Upstream mGBA is at [mgba-emu/mgba](https://github.com/mgba-emu/mgba). See [core.gogba.xyz](https://core.gogba.xyz) for the GBA emulator kernel documentation series.
 
 Features
 --------
