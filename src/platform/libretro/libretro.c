@@ -2565,12 +2565,17 @@ static uint8_t _readLux(struct GBALuminanceSource* lux) {
 }
 
 static void _updateCamera(const uint32_t* buffer, unsigned width, unsigned height, size_t pitch) {
-	if (!camData || width > camWidth || height > camHeight) {
+	// The buffer is sized from the pitch, not the width, and the memcpy below writes
+	// `pitch` bytes per row. pitch is an independent parameter of the camera callback,
+	// so it must be part of the reallocation test as well; otherwise a frame with the
+	// same width/height but a larger pitch reuses a buffer whose rows are too short.
+	unsigned reqPitch = pitch / sizeof(*buffer);
+	if (!camData || width > camWidth || height > camHeight || reqPitch > camStride) {
 		if (camData) {
 			free(camData);
 			camData = NULL;
 		}
-		unsigned bufPitch = pitch / sizeof(*buffer);
+		unsigned bufPitch = reqPitch;
 		unsigned bufHeight = height;
 		if (imcapWidth > bufPitch) {
 			bufPitch = imcapWidth;
