@@ -31,6 +31,7 @@ install_manifest.txt
 
 # Libretro build artifacts
 libretro-build/libs/
+libretro-build/obj/
 mgba_libretro*
 *.ios_arm64.o
 *.bc
