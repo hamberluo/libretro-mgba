@@ -2350,6 +2350,7 @@ void* retro_get_memory_data(unsigned id) {
 		default:
 			break;
 		}
+		break;
 	case RETRO_MEMORY_SYSTEM_RAM:
 		switch (core->platform(core)) {
 #ifdef M_CORE_GB
