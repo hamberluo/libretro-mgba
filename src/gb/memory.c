@@ -157,6 +157,7 @@ void GBMemoryInit(struct GB* gb) {
 	gb->memory.romBank = NULL;
 	gb->memory.romSize = 0;
 	gb->memory.sram = NULL;
+	gb->memory.sramBank = NULL;
 	gb->memory.mbcType = GB_MBC_AUTODETECT;
 	gb->memory.mbcRead = NULL;
 	gb->memory.mbcWrite = NULL;

@@ -149,7 +149,7 @@ void _GBMBC2(struct GB* gb, uint16_t address, uint8_t value) {
 	case 0x81:
 	case 0x82:
 	case 0x83:
-		if (!memory->sramAccess) {
+		if (!memory->sramAccess || !memory->sramBank) {
 			return;
 		}
 		address &= 0x1FF;
@@ -165,7 +165,9 @@ void _GBMBC2(struct GB* gb, uint16_t address, uint8_t value) {
 }
 
 uint8_t _GBMBC2Read(struct GBMemory* memory, uint16_t address) {
-	if (!memory->sramAccess) {
+	// sramBank stays NULL when the SRAM mapping failed; MBC2 enables sramAccess
+	// straight from a ROM write without ever checking that the bank is backed.
+	if (!memory->sramAccess || !memory->sramBank) {
 		return 0xFF;
 	}
 	address &= 0x1FF;

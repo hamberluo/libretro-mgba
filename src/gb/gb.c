@@ -392,6 +392,15 @@ void GBResizeSram(struct GB* gb, size_t size) {
 	if (gb->sramSize < size) {
 		gb->sramSize = size;
 	}
+	if (!gb->memory.sram) {
+		// Every mapping path above can leave sram NULL: map() returns NULL when
+		// the backing VFile is too small to satisfy the request. Leaving a
+		// non-zero sramSize behind advertises SRAM that cannot be dereferenced,
+		// and callers that only test sramSize -- GBMBCSwitchSramBank(),
+		// _GBCoreSavedataClone() -- then walk a NULL pointer. Keep the pair
+		// consistent so a failed mapping degrades to "no SRAM" everywhere.
+		gb->sramSize = 0;
+	}
 }
 
 void GBSramClean(struct GB* gb, uint32_t frameCount) {
