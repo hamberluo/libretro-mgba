@@ -451,7 +451,10 @@ void GBSavedataUnmask(struct GB* gb) {
 	GBSramDeinit(gb);
 	gb->sramVf = gb->sramRealVf;
 	gb->memory.sram = gb->sramVf->map(gb->sramVf, gb->sramSize, MAP_WRITE);
-	if (gb->sramMaskWriteback) {
+	if (gb->memory.sram == (void*) -1) {
+		gb->memory.sram = NULL;
+	}
+	if (gb->sramMaskWriteback && gb->memory.sram) {
 		vf->seek(vf, 0, SEEK_SET);
 		vf->read(vf, gb->memory.sram, gb->sramSize);
 		gb->sramMaskWriteback = false;

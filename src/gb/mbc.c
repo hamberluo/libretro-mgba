@@ -265,6 +265,23 @@ static enum GBMemoryBankControllerType _detectUnlMBC(const uint8_t* mem, size_t 
 }
 
 void GBMBCSwitchSramBank(struct GB* gb, int bank) {
+	if (!gb->memory.sram || !gb->sramSize) {
+		// Nothing is mapped, so leaving sramBank pointing at a stale mapping
+		// from a previously loaded cartridge would be a use-after-free.
+		gb->memory.sramBank = NULL;
+		gb->memory.sramCurrentBank = 0;
+		return;
+	}
+	if (gb->sramSize < GB_SIZE_EXTERNAL_RAM) {
+		// MBC2 (0x100), MBC7 (0x100) and TAMA5 (0x20) allocate less than a
+		// full bank. The bank-granular bounds check below rejects even bank 0
+		// for them, which used to leave sramBank untouched -- i.e. dangling
+		// across a savestate load or a savedata (un)mask. These MBCs have no
+		// switchable SRAM banks at all, so pin the window to the start.
+		gb->memory.sramBank = gb->memory.sram;
+		gb->memory.sramCurrentBank = 0;
+		return;
+	}
 	size_t bankStart = bank * GB_SIZE_EXTERNAL_RAM;
 	if (bankStart + GB_SIZE_EXTERNAL_RAM > gb->sramSize) {
 		mLOG(GB_MBC, GAME_ERROR, "Attempting to switch to an invalid RAM bank: %0X", bank);
@@ -282,6 +299,16 @@ void GBMBCSwitchSramBank(struct GB* gb, int bank) {
 }
 
 void GBMBCSwitchSramHalfBank(struct GB* gb, int half, int bank) {
+	if (!gb->memory.sram || !gb->sramSize) {
+		if (!half) {
+			gb->memory.sramBank = NULL;
+			gb->memory.sramCurrentBank = 0;
+		} else {
+			gb->memory.sramBank1 = NULL;
+			gb->memory.currentSramBank1 = 0;
+		}
+		return;
+	}
 	ssize_t bankStart = bank * GB_SIZE_EXTERNAL_RAM_HALFBANK;
 	ssize_t sramSize = gb->sramSize - GB_SIZE_MBC6_FLASH;
 	if (bankStart + GB_SIZE_EXTERNAL_RAM_HALFBANK > sramSize) {

@@ -166,6 +166,9 @@ uint8_t _GBHuC3Read(struct GBMemory* memory, uint16_t address) {
 	switch (state->mode) {
 	case GBHUC3_MODE_SRAM_RO:
 	case GBHUC3_MODE_SRAM_RW:
+		if (!memory->sramBank) {
+			return 0xFF;
+		}
 		return memory->sramBank[address & (GB_SIZE_EXTERNAL_RAM - 1)];
 	case GBHUC3_MODE_IN:
 	case GBHUC3_MODE_OUT:

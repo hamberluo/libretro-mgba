@@ -312,7 +312,7 @@ void _GBMBC6(struct GB* gb, uint16_t address, uint8_t value) {
 	case 0x29:
 	case 0x2A:
 	case 0x2B:
-		if (memory->sramAccess) {
+		if (memory->sramAccess && memory->sramBank) {
 			memory->sramBank[address & (GB_SIZE_EXTERNAL_RAM_HALFBANK - 1)] = value;
 			gb->sramDirty |= mSAVEDATA_DIRT_NEW;
 		}
@@ -321,7 +321,7 @@ void _GBMBC6(struct GB* gb, uint16_t address, uint8_t value) {
 	case 0x2D:
 	case 0x2E:
 	case 0x2F:
-		if (memory->sramAccess) {
+		if (memory->sramAccess && memory->sramBank1) {
 			memory->sramBank1[address & (GB_SIZE_EXTERNAL_RAM_HALFBANK - 1)] = value;
 		}
 		break;
@@ -337,9 +337,9 @@ uint8_t _GBMBC6Read(struct GBMemory* memory, uint16_t address) {
 	}
 	switch (address >> 12) {
 	case 0xA:
-		return memory->sramBank[address & (GB_SIZE_EXTERNAL_RAM_HALFBANK - 1)];
+		return memory->sramBank ? memory->sramBank[address & (GB_SIZE_EXTERNAL_RAM_HALFBANK - 1)] : 0xFF;
 	case 0xB:
-		return memory->sramBank1[address & (GB_SIZE_EXTERNAL_RAM_HALFBANK - 1)];
+		return memory->sramBank1 ? memory->sramBank1[address & (GB_SIZE_EXTERNAL_RAM_HALFBANK - 1)] : 0xFF;
 	}
 	return 0xFF;
 }
@@ -439,6 +439,11 @@ uint8_t _GBMBC7Read(struct GBMemory* memory, uint16_t address) {
 void _GBMBC7Write(struct GBMemory* memory, uint16_t address, uint8_t value) {
 	struct GBMBC7State* mbc7 = &memory->mbcState.mbc7;
 	if (mbc7->access != 3) {
+		return;
+	}
+	if (!memory->sram) {
+		// The EEPROM state machine below reads and writes the 256-byte save
+		// directly; without a mapping there is nothing to drive it against.
 		return;
 	}
 	switch (address & 0xF0) {

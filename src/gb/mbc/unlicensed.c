@@ -41,7 +41,9 @@ void _GBPKJD(struct GB* gb, uint16_t address, uint8_t value) {
 		}
 		switch (memory->activeRtcReg) {
 		case 0:
-			memory->sramBank[address & (GB_SIZE_EXTERNAL_RAM - 1)] = value;
+			if (memory->sramBank) {
+				memory->sramBank[address & (GB_SIZE_EXTERNAL_RAM - 1)] = value;
+			}
 			break;
 		case 5:
 		case 6:
@@ -81,6 +83,9 @@ uint8_t _GBPKJDRead(struct GBMemory* memory, uint16_t address) {
 	}
 	switch (memory->activeRtcReg) {
 	case 0:
+		if (!memory->sramBank) {
+			return 0xFF;
+		}
 		return memory->sramBank[address & (GB_SIZE_EXTERNAL_RAM - 1)];
 	case 5:
 	case 6:

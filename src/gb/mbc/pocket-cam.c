@@ -69,6 +69,9 @@ uint8_t _GBPocketCamRead(struct GBMemory* memory, uint16_t address) {
 		}
 		return 0;
 	}
+	if (!memory->sramBank) {
+		return 0xFF;
+	}
 	return memory->sramBank[address & (GB_SIZE_EXTERNAL_RAM - 1)];
 }
 

@@ -209,8 +209,10 @@ void _GBTAMA5(struct GB* gb, uint16_t address, uint8_t value) {
 				case GBTAMA5_ADDR_LO:
 					switch (tama5->registers[GBTAMA5_ADDR_HI] >> 1) {
 					case 0x0: // RAM write
-						memory->sram[address] = out;
-						gb->sramDirty |= mSAVEDATA_DIRT_NEW;
+						if (memory->sram) {
+							memory->sram[address] = out;
+							gb->sramDirty |= mSAVEDATA_DIRT_NEW;
+						}
 						break;
 					case 0x1: // RAM read
 						break;
@@ -313,7 +315,7 @@ uint8_t _GBTAMA5Read(struct GBMemory* memory, uint16_t address) {
 		case GBTAMA5_READ_HI:
 			switch (tama5->registers[GBTAMA5_ADDR_HI] >> 1) {
 			case 0x1:
-				value = memory->sram[address];
+				value = memory->sram ? memory->sram[address] : 0xFF;
 				break;
 			case 0x2:
 				mLOG(GB_MBC, STUB, "TAMA5 unknown read %s: %02X", tama5->reg == GBTAMA5_READ_HI ? "hi" : "lo", address);
