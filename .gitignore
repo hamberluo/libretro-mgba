@@ -55,3 +55,6 @@ DerivedData/
 
 # Codegraph index
 .codegraph/
+
+# 宿主端测试的构建产物
+libretro-build/test-build/
