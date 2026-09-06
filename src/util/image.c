@@ -106,7 +106,7 @@ struct mImage* mImageCreateWithStride(unsigned width, unsigned height, unsigned 
 	image->stride = stride;
 	image->format = format;
 	image->depth = mColorFormatBytes(format);
-	image->data = calloc(width * height, image->depth);
+	image->data = calloc(stride * height, image->depth);
 	if (!image->data) {
 		free(image);
 		return NULL;
@@ -440,7 +440,7 @@ void mImageSetPaletteEntry(struct mImage* image, unsigned index, uint32_t color)
 	if (image->format != mCOLOR_PAL8) {
 		return;
 	}
-	if (index > 256) {
+	if (index >= 256) {
 		return;
 	}
 	image->palette[index] = color;
