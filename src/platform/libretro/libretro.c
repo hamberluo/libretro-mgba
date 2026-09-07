@@ -2174,6 +2174,11 @@ bool retro_load_game(const struct retro_game_info* game) {
 		if (bios) {
 			core->loadBIOS(core, bios, 0);
 		}
+		// The BIOS name is derived from the detected model, so log the resolved
+		// path either way to show which file the core actually looked for.
+		if (logCallback) {
+			logCallback(bios ? RETRO_LOG_INFO : RETRO_LOG_WARN, "BIOS %s: %s\n", bios ? "loaded" : "not found", biosPath);
+		}
 	}
 #endif
 
