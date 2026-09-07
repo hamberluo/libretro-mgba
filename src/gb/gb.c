@@ -58,6 +58,12 @@ static const uint8_t _cgbBiosHram[GB_SIZE_HRAM] = {
 #define AGB_BIOS_CHECKSUM 0xFFD6B0F1
 #define AGB0_BIOS_CHECKSUM 0x570337EA
 
+// Reimplementations (behaviorally compatible, different code)
+#define DMGC_BIOS_CHECKSUM 0x07A278D0
+#define DMG_BOOTIX_CHECKSUM 0x02CE331C
+#define MGBC_BIOS_CHECKSUM 0x08F6FC29
+#define MGB_BOOTIX_CHECKSUM 0xE5FF9525
+
 #define FORTUNE_BIOS_CHECKSUM 0x66CC6D94
 #define GAMEFIGHTER_BIOS_CHECKSUM 0x908BA8DE
 #define KONGFENG_GBBC_BIOS_CHECKSUM 0x69236128
@@ -609,6 +615,11 @@ bool GBIsBIOS(struct VFile* vf) {
 	case CGBE_BIOS_CHECKSUM:
 	case AGB_BIOS_CHECKSUM:
 	case AGB0_BIOS_CHECKSUM:
+	// Reimplementations
+	case DMGC_BIOS_CHECKSUM:
+	case DMG_BOOTIX_CHECKSUM:
+	case MGBC_BIOS_CHECKSUM:
+	case MGB_BOOTIX_CHECKSUM:
 	// Bootleg consoles
 	case FORTUNE_BIOS_CHECKSUM:
 	case GAMEFIGHTER_BIOS_CHECKSUM:
@@ -627,6 +638,11 @@ bool GBIsCompatibleBIOS(struct VFile* vf, enum GBModel model) {
 	case MGB_BIOS_CHECKSUM:
 	case SGB_BIOS_CHECKSUM:
 	case SGB2_BIOS_CHECKSUM:
+	// Reimplementations
+	case DMGC_BIOS_CHECKSUM:
+	case DMG_BOOTIX_CHECKSUM:
+	case MGBC_BIOS_CHECKSUM:
+	case MGB_BOOTIX_CHECKSUM:
 	// Bootleg consoles
 	case FORTUNE_BIOS_CHECKSUM:
 	case GAMEFIGHTER_BIOS_CHECKSUM:
@@ -921,6 +937,9 @@ void GBDetectModel(struct GB* gb) {
 		switch (_GBBiosCRC32(gb->biosVf)) {
 		case DMG_BIOS_CHECKSUM:
 		case DMG0_BIOS_CHECKSUM:
+		// Reimplementations
+		case DMGC_BIOS_CHECKSUM:
+		case DMG_BOOTIX_CHECKSUM:
 		// Bootleg consoles
 		case FORTUNE_BIOS_CHECKSUM:
 		case GAMEFIGHTER_BIOS_CHECKSUM:
@@ -928,6 +947,9 @@ void GBDetectModel(struct GB* gb) {
 			gb->model = GB_MODEL_DMG;
 			break;
 		case MGB_BIOS_CHECKSUM:
+		// Reimplementations
+		case MGBC_BIOS_CHECKSUM:
+		case MGB_BOOTIX_CHECKSUM:
 			gb->model = GB_MODEL_MGB;
 			break;
 		case SGB_BIOS_CHECKSUM:
