@@ -46,6 +46,7 @@ INCLUDES=(-I"$ROOT_DIR/include" -I"$ROOT_DIR/src" -I"$ROOT_DIR")
 # 每项测试: 名字:测试源文件:一起编译的真实源文件(空格分隔)
 TESTS=(
 	"mbc-sram:src/gb/test/mbc-sram.c:src/gb/mbc.c src/gb/mbc/huc-3.c src/gb/mbc/licensed.c src/gb/mbc/mbc.c src/gb/mbc/pocket-cam.c src/gb/mbc/tama5.c src/gb/mbc/unlicensed.c src/util/vfs/vfs-mem.c src/util/crc32.c"
+	"audio-rate:src/gb/test/audio-rate.c:"
 )
 
 mkdir -p "$BUILD_DIR"
@@ -78,7 +79,7 @@ for entry in "${TESTS[@]}"; do
 		-o "$BUILD_DIR/$name" \
 		"$ROOT_DIR/$test_src" \
 		"$ROOT_DIR/src/gb/test/stubs.c" \
-		$(cd "$ROOT_DIR" && ls $core_src | sed "s|^|$ROOT_DIR/|")
+		$( [ -n "$core_src" ] && cd "$ROOT_DIR" && ls $core_src | sed "s|^|$ROOT_DIR/|")
 
 	ran=$((ran + 1))
 	if "$BUILD_DIR/$name"; then

@@ -440,9 +440,26 @@ static void _GBCoreSetAudioBufferSize(struct mCore* core, size_t samples) {
 	GBAudioResizeBuffer(&gb->audio, samples);
 }
 
+static int32_t _GBCoreTimingFrequency(const struct mCore* core);
+
 static unsigned _GBCoreAudioSampleRate(const struct mCore* core) {
-	UNUSED(core);
-	return 131072;
+	// GBAudioSample() emits one frame every SAMPLE_INTERVAL (32) * timingFactor
+	// ticks of mTiming, and timingFactor is 2 for every non-GBA style. So the
+	// rate follows the *timing* frequency, not the CPU frequency: DMG and CGB
+	// share one mTiming clock (8388608) and land on the historical 131072, while
+	// an SGB's is 2 * 4295454 and lands on 134233 -- ~2.4% higher, because an
+	// SGB genuinely runs that much faster.
+	//
+	// Returning a hardcoded 131072 understated SGB by exactly that much. A
+	// frontend pacing on the declared rate then receives 2.4% more audio than it
+	// accounts for, forever; mgba's own libretro layer never noticed because it
+	// posts GB audio through postAudioBuffer without resampling, but a
+	// resampling frontend accumulates the surplus until its queue overflows and
+	// has to discard, each discard splicing the stream into audible crackle.
+	//
+	// Deriving this from _GBCoreFrequency() instead would be wrong: that is the
+	// CPU clock, which is doubled for CGB, and would double the CGB rate.
+	return _GBCoreTimingFrequency(core) / (32 * 2);
 }
 
 static size_t _GBCoreGetAudioBufferSize(struct mCore* core) {
