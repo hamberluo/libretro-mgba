@@ -188,6 +188,13 @@ void mCheatDeviceClear(struct mCheatDevice* device) {
 	size_t i;
 	for (i = 0; i < mCheatSetsSize(&device->cheats); ++i) {
 		struct mCheatSet* set = *mCheatSetsGetPointer(&device->cheats, i);
+		// A set that patched the ROM has to put it back before it goes: the
+		// patch lives in the ROM image, not in the set, and nothing else
+		// remembers the original bytes once unpatchedMemory loses the entry.
+		// Frontends clear the device to re-apply a changed cheat list, so a
+		// patch left behind here survives every later reset and outlives the
+		// cheat that installed it.
+		_unpatchROM(device, set);
 		mCheatSetDeinit(set);
 	}
 	mCheatSetsClear(&device->cheats);

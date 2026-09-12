@@ -47,6 +47,8 @@ INCLUDES=(-I"$ROOT_DIR/include" -I"$ROOT_DIR/src" -I"$ROOT_DIR")
 TESTS=(
 	"mbc-sram:src/gb/test/mbc-sram.c:src/gb/mbc.c src/gb/mbc/huc-3.c src/gb/mbc/licensed.c src/gb/mbc/mbc.c src/gb/mbc/pocket-cam.c src/gb/mbc/tama5.c src/gb/mbc/unlicensed.c src/util/vfs/vfs-mem.c src/util/crc32.c"
 	"audio-rate:src/gb/test/audio-rate.c:"
+	"cheat-split:src/platform/libretro/test/cheat-split.c:src/platform/libretro/cheat-split.c src/platform/libretro/test/stubs.c src/core/cheats.c src/gba/cheats.c src/gba/cheats/gameshark.c src/gba/cheats/parv3.c src/gba/cheats/codebreaker.c src/util/string.c src/util/table.c src/util/vector.c"
+	"cheat-unpatch:src/platform/libretro/test/cheat-unpatch.c:src/platform/libretro/test/stubs.c src/core/cheats.c src/gba/cheats.c src/gba/cheats/gameshark.c src/gba/cheats/parv3.c src/gba/cheats/codebreaker.c src/util/string.c src/util/table.c src/util/vector.c"
 )
 
 mkdir -p "$BUILD_DIR"
