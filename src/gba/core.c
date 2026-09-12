@@ -307,6 +307,15 @@ static bool _GBACoreInit(struct mCore* core) {
 }
 
 static void _GBACoreDeinit(struct mCore* core) {
+	struct GBACore* gbacore = (struct GBACore*) core;
+	// A cheat set that patched the ROM reverts the patch as it is
+	// destroyed, and the revert writes through the core into emulated
+	// memory. Destroy the device first, while that memory is still
+	// mapped -- below this point the CPU and board are gone.
+	if (gbacore->cheatDevice) {
+		mCheatDeviceDestroy(gbacore->cheatDevice);
+		gbacore->cheatDevice = NULL;
+	}
 	ARMDeinit(core->cpu);
 	GBADestroy(core->board);
 	mappedMemoryFree(core->cpu, sizeof(struct ARMCore));
@@ -320,11 +329,7 @@ static void _GBACoreDeinit(struct mCore* core) {
 	}
 #endif
 
-	struct GBACore* gbacore = (struct GBACore*) core;
 	free(gbacore->debuggerPlatform);
-	if (gbacore->cheatDevice) {
-		mCheatDeviceDestroy(gbacore->cheatDevice);
-	}
 	mCoreConfigFreeOpts(&core->opts);
 	free(core);
 }

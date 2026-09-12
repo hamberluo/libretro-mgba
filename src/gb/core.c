@@ -159,6 +159,15 @@ static bool _GBCoreInit(struct mCore* core) {
 }
 
 static void _GBCoreDeinit(struct mCore* core) {
+	struct GBCore* gbcore = (struct GBCore*) core;
+	// A cheat set that patched the ROM reverts the patch as it is
+	// destroyed, and the revert writes through the core into emulated
+	// memory. Destroy the device first, while that memory is still
+	// mapped -- below this point the CPU and board are gone.
+	if (gbcore->cheatDevice) {
+		mCheatDeviceDestroy(gbcore->cheatDevice);
+		gbcore->cheatDevice = NULL;
+	}
 	SM83Deinit(core->cpu);
 	GBDestroy(core->board);
 	mappedMemoryFree(core->cpu, sizeof(struct SM83Core));
@@ -172,11 +181,7 @@ static void _GBCoreDeinit(struct mCore* core) {
 	}
 #endif
 
-	struct GBCore* gbcore = (struct GBCore*) core;
 	free(gbcore->debuggerPlatform);
-	if (gbcore->cheatDevice) {
-		mCheatDeviceDestroy(gbcore->cheatDevice);
-	}
 	mCoreConfigFreeOpts(&core->opts);
 	free(core);
 }
