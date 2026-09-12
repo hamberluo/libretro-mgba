@@ -4,6 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include "libretro.h"
+#include "cheat-split.h"
 
 #include <mgba-util/common.h>
 
@@ -2191,6 +2192,9 @@ void retro_unload_game(void) {
 	}
 	mCoreConfigDeinit(&core->config);
 	core->deinit(core);
+	// deinit frees the core, so clear the pointer with the rest: the guard
+	// above is what makes a second unload safe.
+	core = NULL;
 	mappedMemoryFree(data, dataSize);
 	data = 0;
 	mappedMemoryFree(savedata, savedataSize);
@@ -2236,13 +2240,47 @@ bool retro_unserialize(const void* data, size_t size) {
 	return success;
 }
 
+/* Upper bound on one cheat line; the GBA parsers read at most 17 characters. */
+#define MAX_CHEAT_LINE_LENGTH 64
+
+/* GoGBA extension: see `retro_cheat_last_result` below. */
+static int cheatLastAccepted = -1;
+
+/* GoGBA extension: see `retro_cheat_last_produced` below. */
+static int cheatLastProduced = -1;
+
 void retro_cheat_reset(void) {
+	if (!core) {
+		return;
+	}
 	mCheatDeviceClear(core->cheatDevice(core));
+	cheatLastAccepted = -1;
+	cheatLastProduced = -1;
 }
 
-void retro_cheat_set(unsigned index, bool enabled, const char* code) {
-	UNUSED(index);
-	UNUSED(enabled);
+/* GoGBA extension: cheat parse feedback and explicit format selection.
+ *
+ * `retro_cheat_set` returns void, so a code mGBA's autodetect cannot parse
+ * fails silently and the user only sees a cheat that does nothing. mGBA's
+ * `mCheatAddLine` does return whether the line was understood, so the result
+ * is recorded here and read back through `retro_cheat_last_result`.
+ *
+ * Autodetect also votes one line at a time, so a code whose lines look
+ * ambiguous in isolation can be read as the wrong format.
+ * `retro_cheat_set_typed` forwards an explicit `GBA_CHEAT_*` / `GB_CHEAT_*`
+ * type so a user can override the guess.
+ *
+ * Both extras are named `retro_*` on purpose: `link.T` only exports that
+ * prefix. They are additions, never changes to the standard entry points.
+ */
+static void _cheatSetWithType(const char* code, int type) {
+	// No core means the code was not accepted, which is what the frontend
+	// should report rather than a silent success.
+	if (!core) {
+		cheatLastAccepted = 0;
+		cheatLastProduced = 0;
+		return;
+	}
 	struct mCheatDevice* device = core->cheatDevice(core);
 	struct mCheatSet* cheatSet = NULL;
 	if (mCheatSetsSize(&device->cheats)) {
@@ -2251,25 +2289,20 @@ void retro_cheat_set(unsigned index, bool enabled, const char* code) {
 		cheatSet = device->createSet(device, NULL);
 		mCheatAddSet(device, cheatSet);
 	}
-// Convert the super wonky unportable libretro format to something normal
+	bool anyLine = false;
+	bool allAccepted = true;
+	// The set accumulates, so what this code produced is the growth across it.
+	const size_t cheatsBefore = mCheatListSize(&cheatSet->list);
+	const size_t patchesBefore = mCheatPatchListSize(&cheatSet->romPatches);
+// Convert the super wonky unportable libretro format to something normal.
 #ifdef M_CORE_GBA
 	if (core->platform(core) == mPLATFORM_GBA) {
-		char realCode[] = "XXXXXXXX XXXXXXXX";
-		size_t len = strlen(code) + 1; // Include null terminator
-		size_t i, pos;
-		for (i = 0, pos = 0; i < len; ++i) {
-			if (isspace((int) code[i]) || code[i] == '+') {
-				realCode[pos] = ' ';
-			} else {
-				realCode[pos] = code[i];
+		char realCode[MAX_CHEAT_LINE_LENGTH];
+		while ((code = retroCheatNextLine(code, realCode, sizeof(realCode)))) {
+			anyLine = true;
+			if (!mCheatAddLine(cheatSet, realCode, type)) {
+				allAccepted = false;
 			}
-			if ((pos == 13 && (realCode[pos] == ' ' || !realCode[pos])) || pos == 17) {
-				realCode[pos] = '\0';
-				mCheatAddLine(cheatSet, realCode, 0);
-				pos = 0;
-				continue;
-			}
-			++pos;
 		}
 	}
 #endif
@@ -2287,7 +2320,10 @@ void retro_cheat_set(unsigned index, bool enabled, const char* code) {
 
 			if (pos == 11 || !realCode[pos]) {
 				realCode[pos] = '\0';
-				mCheatAddLine(cheatSet, realCode, 0);
+				anyLine = true;
+				if (!mCheatAddLine(cheatSet, realCode, type)) {
+					allAccepted = false;
+				}
 				pos = 0;
 				continue;
 			}
@@ -2295,9 +2331,49 @@ void retro_cheat_set(unsigned index, bool enabled, const char* code) {
 		}
 	}
 #endif
+	cheatLastAccepted = (anyLine && allAccepted) ? 1 : 0;
+	cheatLastProduced = (int) ((mCheatListSize(&cheatSet->list) - cheatsBefore) +
+	                          (mCheatPatchListSize(&cheatSet->romPatches) - patchesBefore));
 	if (cheatSet->refresh) {
 		cheatSet->refresh(cheatSet, device);
 	}
+}
+
+void retro_cheat_set(unsigned index, bool enabled, const char* code) {
+	UNUSED(index);
+	UNUSED(enabled);
+	_cheatSetWithType(code, 0);
+}
+
+/* GoGBA extension. Same as `retro_cheat_set`, but `type` is passed straight to
+ * `mCheatAddLine` instead of 0 (autodetect). Pass a `GBA_CHEAT_*` value for a
+ * GBA game or a `GB_CHEAT_*` value for a GB/GBC one; 0 is autodetect on both.
+ */
+RETRO_API void retro_cheat_set_typed(unsigned index, bool enabled, const char* code, int type) {
+	UNUSED(index);
+	UNUSED(enabled);
+	_cheatSetWithType(code, type);
+}
+
+/* GoGBA extension. Result of the most recent cheat set call: 1 when every line
+ * was parsed, 0 when at least one was rejected, -1 when no call has been made.
+ */
+RETRO_API int retro_cheat_last_result(void) {
+	return cheatLastAccepted;
+}
+
+/* GoGBA extension. How many cheats and ROM patches the most recent cheat set
+ * call added, or -1 when no call has been made.
+ *
+ * A GameShark v3 code seeds its decryption from the lines already in the set,
+ * so half of one -- the master code on its own -- parses without producing
+ * anything at all. That reads as success through `retro_cheat_last_result`,
+ * and the frontend needs the difference to tell a user that a code is part of
+ * a longer one rather than a code in its own right. Every standalone format
+ * produces at least one entry.
+ */
+RETRO_API int retro_cheat_last_produced(void) {
+	return cheatLastProduced;
 }
 
 unsigned retro_get_region(void) {
