@@ -195,6 +195,15 @@ void mCheatDeviceClear(struct mCheatDevice* device) {
 		// patch left behind here survives every later reset and outlives the
 		// cheat that installed it.
 		_unpatchROM(device, set);
+		// Same for an execution hook. A GameShark v3 master code arms one by
+		// writing a breakpoint opcode into the ROM, and the handler that puts
+		// the original instruction back needs the set that is about to be
+		// freed. mCheatDeviceDeinit and mCheatRemoveSet both clear it; only
+		// this path did not, leaving a breakpoint in the boot path that no
+		// reset can lift, because reset does not reload the ROM.
+		if (set->remove) {
+			set->remove(set, device);
+		}
 		mCheatSetDeinit(set);
 	}
 	mCheatSetsClear(&device->cheats);
