@@ -72,6 +72,15 @@ const char* retroCheatNextLine(const char* code, char* line, size_t size) {
 			snprintf(line, size, "%s %s", first, second);
 			return afterSecond;
 		}
+		// A two-digit value is an 8-bit write, which the autodetect parser only
+		// reaches through the VBA form: it needs `hex32` then `hex16`, so
+		// "02024EA0 10" stops one digit short and is rejected. The colon says
+		// 8-bit outright and costs nothing for the widths above, which already
+		// have a space form that parses.
+		if (afterSecond && isHexRun(second, secondLength, 2)) {
+			snprintf(line, size, "%s:%s", first, second);
+			return afterSecond;
+		}
 	}
 
 	strncpy(line, first, size - 1);

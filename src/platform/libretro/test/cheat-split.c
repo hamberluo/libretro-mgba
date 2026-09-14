@@ -110,6 +110,26 @@ int main(void) {
 	struct mCheatSet* standalone = parse(device, "320375D4+0000");
 	ok("a standalone code produces an entry", mCheatListSize(&standalone->list) == 1);
 
+	// An 8-bit value is written as its own segment too: "02024EA0+10" sets one
+	// byte, which is the VBA form "02024EA0:10". Pairing stops at 4 and 8 digits
+	// otherwise, and the two halves then reach the parser alone -- a bare
+	// address parses as nothing and a bare "10" is rejected outright.
+	struct mCheatSet* byteValue = parse(device, "02024EA0+10");
+	ok("an 8-bit value pairs with its address", mCheatListSize(&byteValue->list) == 1);
+	ok("the 8-bit write keeps its width and operand",
+	   mCheatListSize(&byteValue->list) == 1 &&
+	   mCheatListGetPointer(&byteValue->list, 0)->address == 0x02024EA0 &&
+	   mCheatListGetPointer(&byteValue->list, 0)->width == 1 &&
+	   mCheatListGetPointer(&byteValue->list, 0)->operand == 0x10);
+
+	// Four such pairs in one code, from the field report ("第一 pp").
+	struct mCheatSet* fourBytes = parse(device, "02024C75+FF+02024C76+FF+02024C77+FF+02024C78+FF");
+	ok("four 8-bit pairs become four cheats, each with its own operand",
+	   mCheatListSize(&fourBytes->list) == 4 &&
+	   mCheatListGetPointer(&fourBytes->list, 0)->address == 0x02024C75 &&
+	   mCheatListGetPointer(&fourBytes->list, 3)->address == 0x02024C78 &&
+	   mCheatListGetPointer(&fourBytes->list, 3)->operand == 0xFF);
+
 	// Splitter edge cases.
 	char line[8];
 	ok("empty string yields no line", retroCheatNextLine("", line, sizeof(line)) == NULL);
