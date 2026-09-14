@@ -249,6 +249,10 @@ bool GBACheatAddCodeBreaker(struct GBACheatSet* cheats, uint32_t op1, uint16_t o
 
 	switch (type) {
 	case CB_GAME_ID:
+		// A game ID is 0000XXXX; a region byte means a raw "address value" write.
+		if (op1 >> 24) {
+			return GBACheatAddRawWrite(cheats, op1, op2, 2);
+		}
 		// TODO: Run checksum
 		return true;
 	case CB_HOOK:

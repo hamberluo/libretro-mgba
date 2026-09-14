@@ -179,7 +179,10 @@ bool GBACheatAddVBALine(struct GBACheatSet* cheats, const char* line) {
 	if (width == 0 || width == 3) {
 		return false;
 	}
+	return GBACheatAddRawWrite(cheats, address, value, width);
+}
 
+bool GBACheatAddRawWrite(struct GBACheatSet* cheats, uint32_t address, uint32_t value, int width) {
 	if (address < GBA_BASE_ROM0 || address >= GBA_BASE_SRAM) {
 		struct mCheat* cheat = mCheatListAppend(&cheats->d.list);
 		memset(cheat, 0, sizeof(*cheat));
@@ -246,6 +249,11 @@ bool GBACheatAddLine(struct mCheatSet* set, const char* line, int type) {
 	uint32_t realOp2 = op2;
 	realOp2 <<= 16;
 	realOp2 |= op3;
+	// GameShark's 0-type is a byte write, which never targets ROM; a raw
+	// "address value" ROM write is the only reading left for this shape.
+	if (!(op1 >> 28) && op1 >= GBA_BASE_ROM0 && op1 < GBA_BASE_SRAM) {
+		return GBACheatAddRawWrite(cheats, op1, realOp2, 4);
+	}
 	return GBACheatAddAutodetect(cheats, op1, realOp2);
 }
 
