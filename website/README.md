@@ -1,6 +1,6 @@
 # GBA 内核精讲文档站
 
-VitePress 静态文档站，部署在 https://core.gogba.xyz/ （自定义域名，base 为 `/`）。
+VitePress 静态文档站，部署在 https://hamberluo.github.io/libretro-mgba/ （GitHub Pages 项目页，base 为 `/libretro-mgba/`）。
 
 ## 本地开发
 
