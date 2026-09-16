@@ -251,7 +251,11 @@ bool GBACheatAddLine(struct mCheatSet* set, const char* line, int type) {
 	realOp2 |= op3;
 	// GameShark's 0-type is a byte write, which never targets ROM; a raw
 	// "address value" ROM write is the only reading left for this shape.
-	if (!(op1 >> 28) && op1 >= GBA_BASE_ROM0 && op1 < GBA_BASE_SRAM) {
+	// Only the first 32MiB can be one: a cartridge ends there, and the
+	// mirrors above it are where an encrypted line -- ciphertext, so a
+	// leading 0 nibble one time in sixteen -- would otherwise be stolen from
+	// autodetect and written as a nonsense patch.
+	if (!(op1 >> 28) && op1 >= GBA_BASE_ROM0 && op1 < GBA_BASE_ROM0 + GBA_SIZE_ROM0) {
 		return GBACheatAddRawWrite(cheats, op1, realOp2, 4);
 	}
 	return GBACheatAddAutodetect(cheats, op1, realOp2);

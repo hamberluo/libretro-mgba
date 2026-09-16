@@ -100,6 +100,16 @@ int main(void) {
 	ok("a CodeBreaker game ID still produces nothing",
 	   mCheatListSize(&gameId->list) == 0 && mCheatPatchListSize(&gameId->romPatches) == 0);
 
+	// An encrypted code is ciphertext: its leading nibble is effectively
+	// random, so one in sixteen lands on 0 and would read as a raw write. A
+	// real cartridge ends at 32MiB, so only 0x08-0x09 can be a raw ROM write;
+	// this Emerald encounter code decrypts under PARv3 to a keypad condition.
+	struct mCheatSet* encrypted = parse(device, "0CE31DF76D3FC225");
+	ok("an encrypted line above the 32MiB cart is not a raw ROM write",
+	   mCheatPatchListSize(&encrypted->romPatches) == 0 &&
+	   mCheatListSize(&encrypted->list) == 1 &&
+	   mCheatListGetPointer(&encrypted->list, 0)->address == 0x04000130);
+
 	// GameShark's raw 8-bit write shares the 32-bit shape over RAM; it must
 	// keep its width.
 	struct mCheatSet* gs = parse(device, "02024EA000000010");
