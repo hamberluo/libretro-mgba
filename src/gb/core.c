@@ -163,8 +163,12 @@ static void _GBCoreDeinit(struct mCore* core) {
 	// A cheat set that patched the ROM reverts the patch as it is
 	// destroyed, and the revert writes through the core into emulated
 	// memory. Destroy the device first, while that memory is still
-	// mapped -- below this point the CPU and board are gone.
+	// mapped -- below this point the CPU and board are gone. Detach it
+	// from the CPU too: SM83Deinit walks that slot and would call deinit
+	// on the freed device.
 	if (gbcore->cheatDevice) {
+		SM83HotplugDetach(core->cpu, CPU_COMPONENT_CHEAT_DEVICE);
+		((struct SM83Core*) core->cpu)->components[CPU_COMPONENT_CHEAT_DEVICE] = NULL;
 		mCheatDeviceDestroy(gbcore->cheatDevice);
 		gbcore->cheatDevice = NULL;
 	}

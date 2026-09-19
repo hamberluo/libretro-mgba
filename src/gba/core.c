@@ -311,8 +311,12 @@ static void _GBACoreDeinit(struct mCore* core) {
 	// A cheat set that patched the ROM reverts the patch as it is
 	// destroyed, and the revert writes through the core into emulated
 	// memory. Destroy the device first, while that memory is still
-	// mapped -- below this point the CPU and board are gone.
+	// mapped -- below this point the CPU and board are gone. Detach it
+	// from the CPU too: ARMDeinit walks that slot and would call deinit
+	// on the freed device.
 	if (gbacore->cheatDevice) {
+		ARMHotplugDetach(core->cpu, CPU_COMPONENT_CHEAT_DEVICE);
+		((struct ARMCore*) core->cpu)->components[CPU_COMPONENT_CHEAT_DEVICE] = NULL;
 		mCheatDeviceDestroy(gbacore->cheatDevice);
 		gbacore->cheatDevice = NULL;
 	}

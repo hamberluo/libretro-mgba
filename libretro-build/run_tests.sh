@@ -41,15 +41,26 @@ DEFINES=(
 	-DPATH_MAX=1024
 )
 
+# macOS has the real locale_t and the _l string functions, but declares
+# strtof_l in xlocale.h. Without both, formatting.h falls back to its own
+# locale_t typedef and clashes with the SDK's. The SDK also deprecates
+# sprintf, which upstream still uses.
+HOST_FLAGS=()
+if [ "$(uname -s)" = "Darwin" ]; then
+	DEFINES+=(-DHAVE_LOCALE -DHAVE_XLOCALE -DHAVE_STRTOF_L)
+	HOST_FLAGS+=(-Wno-deprecated-declarations)
+fi
+
 INCLUDES=(-I"$ROOT_DIR/include" -I"$ROOT_DIR/src" -I"$ROOT_DIR")
 
 # 每项测试: 名字:测试源文件:一起编译的真实源文件(空格分隔)
 TESTS=(
-	"mbc-sram:src/gb/test/mbc-sram.c:src/gb/mbc.c src/gb/mbc/huc-3.c src/gb/mbc/licensed.c src/gb/mbc/mbc.c src/gb/mbc/pocket-cam.c src/gb/mbc/tama5.c src/gb/mbc/unlicensed.c src/util/vfs/vfs-mem.c src/util/crc32.c"
-	"audio-rate:src/gb/test/audio-rate.c:"
-	"cheat-split:src/platform/libretro/test/cheat-split.c:src/platform/libretro/cheat-split.c src/platform/libretro/test/stubs.c src/core/cheats.c src/gba/cheats.c src/gba/cheats/gameshark.c src/gba/cheats/parv3.c src/gba/cheats/codebreaker.c src/util/string.c src/util/table.c src/util/vector.c"
-	"cheat-raw:src/gba/test/cheat-raw.c:src/platform/libretro/cheat-split.c src/platform/libretro/test/stubs.c src/core/cheats.c src/gba/cheats.c src/gba/cheats/gameshark.c src/gba/cheats/parv3.c src/gba/cheats/codebreaker.c src/util/string.c src/util/table.c src/util/vector.c"
-	"cheat-unpatch:src/platform/libretro/test/cheat-unpatch.c:src/platform/libretro/test/stubs.c src/core/cheats.c src/gba/cheats.c src/gba/cheats/gameshark.c src/gba/cheats/parv3.c src/gba/cheats/codebreaker.c src/util/string.c src/util/table.c src/util/vector.c"
+	"mbc-sram:src/gb/test/mbc-sram.c:src/gb/test/stubs.c src/gb/mbc.c src/gb/mbc/huc-3.c src/gb/mbc/licensed.c src/gb/mbc/mbc.c src/gb/mbc/pocket-cam.c src/gb/mbc/tama5.c src/gb/mbc/unlicensed.c src/util/vfs/vfs-mem.c src/util/crc32.c"
+	"audio-rate:src/gb/test/audio-rate.c:src/gb/test/stubs.c"
+	"cheat-split:src/platform/libretro/test/cheat-split.c:src/gb/test/stubs.c src/platform/libretro/cheat-split.c src/platform/libretro/test/stubs.c src/core/cheats.c src/gba/cheats.c src/gba/cheats/gameshark.c src/gba/cheats/parv3.c src/gba/cheats/codebreaker.c src/util/string.c src/util/table.c src/util/vector.c"
+	"cheat-raw:src/gba/test/cheat-raw.c:src/gb/test/stubs.c src/platform/libretro/cheat-split.c src/platform/libretro/test/stubs.c src/core/cheats.c src/gba/cheats.c src/gba/cheats/gameshark.c src/gba/cheats/parv3.c src/gba/cheats/codebreaker.c src/util/string.c src/util/table.c src/util/vector.c"
+	"cheat-unpatch:src/platform/libretro/test/cheat-unpatch.c:src/gb/test/stubs.c src/platform/libretro/test/stubs.c src/core/cheats.c src/gba/cheats.c src/gba/cheats/gameshark.c src/gba/cheats/parv3.c src/gba/cheats/codebreaker.c src/util/string.c src/util/table.c src/util/vector.c"
+	"core-deinit:src/gb/test/core-deinit.c:src/gb/test/core-deinit-stubs.c src/core/*.c src/gb/*.c src/gb/mbc/*.c src/gb/renderers/*.c src/sm83/*.c src/util/*.c src/util/vfs/vfs-file.c src/util/vfs/vfs-mem.c"
 )
 
 mkdir -p "$BUILD_DIR"
@@ -76,12 +87,12 @@ for entry in "${TESTS[@]}"; do
 	echo "$name"
 	echo "========================================"
 
+	# ASan: a use-after-free on a teardown path exits 0 without it.
 	# shellcheck disable=SC2086
-	"$CC" -g -O1 -Wall \
-		"${DEFINES[@]}" "${INCLUDES[@]}" \
+	"$CC" -g -O1 -Wall -fsanitize=address -fno-omit-frame-pointer \
+		"${HOST_FLAGS[@]}" "${DEFINES[@]}" "${INCLUDES[@]}" \
 		-o "$BUILD_DIR/$name" \
 		"$ROOT_DIR/$test_src" \
-		"$ROOT_DIR/src/gb/test/stubs.c" \
 		$( [ -n "$core_src" ] && cd "$ROOT_DIR" && ls $core_src | sed "s|^|$ROOT_DIR/|")
 
 	ran=$((ran + 1))
