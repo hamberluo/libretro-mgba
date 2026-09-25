@@ -116,6 +116,21 @@ int main(void) {
 	ok("a GameShark 8-bit RAM write keeps its width",
 	   mCheatListSize(&gs->list) == 1 && isWrite(gs, 0, 0x02024EA0, 1, 0x10));
 
+	// A GameShark byte write carries its byte in 000000VV. A value above 0xFF
+	// cannot be one, so it is a raw 32-bit write -- how Pokémon hack posts
+	// write "item x999" into the PC's first slot.
+	struct mCheatSet* raw32 = parse(device, "02025E9A03E70001");
+	ok("a RAM write with a value above a byte is a raw 32-bit write",
+	   mCheatListSize(&raw32->list) == 1 && isWrite(raw32, 0, 0x02025E9A, 4, 0x03E70001));
+
+	// libretro keeps every code in one set; a PARv3 pin must not decrypt it.
+	struct mCheatSet* pinned = parse(device, "7881A409E2026E0C+8E883EFF92E9660D+8173E2E87E090FC0");
+	size_t pinnedBefore = mCheatListSize(&pinned->list);
+	feed(pinned, "020240A8FFFFFFFF");
+	ok("a raw 32-bit RAM write survives a set already pinned to PARv3",
+	   mCheatListSize(&pinned->list) == pinnedBefore + 1 &&
+	   isWrite(pinned, pinnedBefore, 0x020240A8, 4, 0xFFFFFFFF));
+
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures ? 1 : 0;
 }

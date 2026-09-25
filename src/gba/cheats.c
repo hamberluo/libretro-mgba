@@ -154,6 +154,11 @@ static bool GBACheatAddAutodetect(struct GBACheatSet* set, uint32_t op1, uint32_
 	return false;
 }
 
+static bool _isRam(uint32_t address) {
+	return (address >= GBA_BASE_EWRAM && address < GBA_BASE_EWRAM + GBA_SIZE_EWRAM) ||
+	       (address >= GBA_BASE_IWRAM && address < GBA_BASE_IWRAM + GBA_SIZE_IWRAM);
+}
+
 bool GBACheatAddVBALine(struct GBACheatSet* cheats, const char* line) {
 	uint32_t address;
 	uint8_t op;
@@ -256,6 +261,12 @@ bool GBACheatAddLine(struct mCheatSet* set, const char* line, int type) {
 	// leading 0 nibble one time in sixteen -- would otherwise be stolen from
 	// autodetect and written as a nonsense patch.
 	if (!(op1 >> 28) && op1 >= GBA_BASE_ROM0 && op1 < GBA_BASE_ROM0 + GBA_SIZE_ROM0) {
+		return GBACheatAddRawWrite(cheats, op1, realOp2, 4);
+	}
+	// The same 0-type carries its byte as 000000VV, so a wider value over
+	// RAM is a raw 32-bit write. Holding to the real RAM sizes leaves an
+	// encrypted line about one chance in 16000 of landing here.
+	if (realOp2 > 0xFF && _isRam(op1)) {
 		return GBACheatAddRawWrite(cheats, op1, realOp2, 4);
 	}
 	return GBACheatAddAutodetect(cheats, op1, realOp2);
