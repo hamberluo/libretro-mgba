@@ -26,13 +26,11 @@ struct RetroLinkSave {
 
 struct RetroLink;
 
-// Builds `players` cores of `platform` from the same ROM, loads each player's
-// save and cold-boots them joined by a cable. `rom`, every saves[i].data and
-// `localVideo` must outlive every core the link creates, including the local
-// one after RetroLinkEnd: the cores use them in place. The local core draws
-// into `localVideo` (`localStride` pixels per row); it has to be given here,
-// because a core binds its renderer at reset only if it already has a buffer.
-// Returns NULL on bad arguments or a ROM the platform rejects.
+// Cold-boots `players` cores of `platform` from one ROM and their saves, joined
+// by a cable. `rom`, the saves and `localVideo` are used in place and must
+// outlive every core, including the local one after RetroLinkEnd. `localVideo`
+// is needed now: a core binds its renderer at reset only if it has a buffer.
+// NULL on bad arguments or a ROM the platform rejects.
 struct RetroLink* RetroLinkCreate(enum mPlatform platform, const void* rom, size_t romSize,
                                   unsigned players, unsigned localPlayer,
                                   const struct RetroLinkSave* saves, int64_t rtcEpochMs,

@@ -24,13 +24,11 @@ struct retro_link_player {
 	size_t save_size;
 };
 
-// Call after retro_load_game (and after writing the local save into
-// RETRO_MEMORY_SAVE_RAM; passing SAVE_RAM itself as saves[local_player] is fine). Rebuilds every player's machine from the loaded ROM,
-// loads saves[i] for player i -- saves[local_player] replaces what SAVE_RAM
-// holds -- and cold-boots them all joined by a link cable. SAVE_RAM keeps its
-// address and becomes the local player's save. Only the local player's machine
-// is shown and heard. Returns false (and changes nothing) if a link is already
-// running, the arguments are out of range, or no game is loaded.
+// Call after retro_load_game and after writing the local save into SAVE_RAM
+// (passing SAVE_RAM itself as saves[local_player] is fine). Cold-boots every
+// player's machine from the loaded ROM and saves[i], joined by a cable; only
+// the local one is shown and heard, and SAVE_RAM becomes its save. False, with
+// nothing changed, if already linked, out of range, or no game is loaded.
 RETRO_API bool retro_link_begin(unsigned players, unsigned local_player,
                                       const struct retro_link_player* saves,
                                       int64_t rtc_epoch_ms);
