@@ -58,3 +58,4 @@ DerivedData/
 
 # 宿主端测试的构建产物
 libretro-build/test-build/
+src/platform/libretro/link_core_id.h

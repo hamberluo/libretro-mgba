@@ -170,6 +170,10 @@ else
 SOURCES_C += $(CORE_DIR)/src/util/vfs/vfs-file.c
 endif
 
-# Link compatibility fingerprint, see link_core_id.sh.
+# Link compatibility fingerprint, see link_core_id.sh. Written to a header,
+# and only when it changes: incremental builds track headers, not flags.
 LINK_CORE_ID := $(shell sh $(CORE_DIR)/libretro-build/link_core_id.sh $(CORE_DIR))
-RETRODEFS += -DGOGBA_LINK_CORE_ID=0x$(LINK_CORE_ID)ULL
+LINK_CORE_ID_H := $(CORE_DIR)/src/platform/libretro/link_core_id.h
+LINK_CORE_ID_DEFINE := \#define GOGBA_LINK_CORE_ID 0x$(LINK_CORE_ID)ULL
+$(shell echo '$(LINK_CORE_ID_DEFINE)' | cmp -s - '$(LINK_CORE_ID_H)' || echo '$(LINK_CORE_ID_DEFINE)' > '$(LINK_CORE_ID_H)')
+RETRODEFS += -DHAVE_GOGBA_LINK_CORE_ID_H

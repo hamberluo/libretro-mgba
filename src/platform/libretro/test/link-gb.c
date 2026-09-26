@@ -108,7 +108,10 @@ int main(void) {
 	CHECK(a->busRead8(a, LINK_GB_SAVE0) == 0x11 && b->busRead8(b, LINK_GB_SAVE0) == 0x22,
 	      "saves crossed: P1 booted with %02X, P2 with %02X", a->busRead8(a, LINK_GB_SAVE0), b->busRead8(b, LINK_GB_SAVE0));
 	CHECK(saves[0][1] == a->busRead8(a, LINK_GB_COUNT), "P1's save buffer did not receive the cartridge RAM write");
-	endAndFree(link);
+	struct mCore* alone = GoGBALinkEnd(link);
+	CHECK(!((struct GB*) alone->board)->memory.rotation, "local core still points at the freed link's tilt sensor");
+	mCoreConfigDeinit(&alone->config);
+	alone->deinit(alone);
 
 	// Determinism.
 	CHECK(runAndChecksum(600) == runAndChecksum(600), "same input, different checksums");

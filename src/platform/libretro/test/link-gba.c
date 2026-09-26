@@ -143,6 +143,9 @@ int main(void) {
 	CHECK(alone->frameCounter(alone) == before + 60, "after unplugging, 60 runFrame calls ran %u frames",
 	      alone->frameCounter(alone) - before);
 	CHECK(!((struct GBA*) alone->board)->sio.driver, "local core still has the lockstep driver");
+	// The link's neutral sensors die with it; the local core must not keep them.
+	CHECK(!((struct GBA*) alone->board)->rotationSource && !((struct GBA*) alone->board)->luminanceSource,
+	      "local core still points at the freed link's sensors");
 	mCoreConfigDeinit(&alone->config);
 	alone->deinit(alone);
 

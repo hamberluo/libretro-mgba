@@ -551,6 +551,13 @@ struct mCore* GoGBALinkEnd(struct GoGBALink* link) {
 	}
 	struct mCore* local = link->player[link->localPlayer].core;
 	link->player[link->localPlayer].core = NULL;
+	// The neutral sensors belong to the link.
+	local->setPeripheral(local, mPERIPH_ROTATION, NULL);
+#ifdef M_CORE_GBA
+	if (link->platform == mPLATFORM_GBA) {
+		local->setPeripheral(local, mPERIPH_GBA_LUMINANCE, NULL);
+	}
+#endif
 	for (i = 0; i < link->players; ++i) {
 		_destroyPlayer(&link->player[i]);
 	}

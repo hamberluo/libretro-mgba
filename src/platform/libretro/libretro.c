@@ -46,7 +46,9 @@ FS_Archive sdmcArchive;
 #include "libretro_gogba.h"
 #include "link.h"
 
-#ifndef GOGBA_LINK_CORE_ID
+#ifdef HAVE_GOGBA_LINK_CORE_ID_H
+#include "link_core_id.h"
+#else
 #define GOGBA_LINK_CORE_ID 0
 #endif
 
@@ -1584,7 +1586,8 @@ void retro_run(void) {
 			.key = "mgba_allow_opposing_directions",
 			.value = 0
 		};
-		if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+		// Emulation options are pinned while linked; one device changing them desyncs.
+		if (!gogbaLink && environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
 			mCoreConfigSetIntValue(&core->config, "allowOpposingDirections", strcmp(var.value, "yes") == 0);
 			core->reloadConfigOption(core, "allowOpposingDirections", NULL);
 		}
@@ -2837,9 +2840,11 @@ RETRO_API bool retro_gogba_link_begin(unsigned players, unsigned localPlayer,
 	unsigned i;
 	for (i = 0; i < players; ++i) {
 		void* buffer = i == localPlayer ? savedata : (linkSaves[i] = anonymousMemoryMap(savedataSize));
-		memset(buffer, 0xFF, savedataSize);
-		if (saves[i].save) {
-			memcpy(buffer, saves[i].save, saves[i].save_size < savedataSize ? saves[i].save_size : savedataSize);
+		if (saves[i].save != buffer) {
+			memset(buffer, 0xFF, savedataSize);
+			if (saves[i].save) {
+				memcpy(buffer, saves[i].save, saves[i].save_size < savedataSize ? saves[i].save_size : savedataSize);
+			}
 		}
 		linkSave[i].data = buffer;
 		linkSave[i].size = savedataSize;
@@ -2885,6 +2890,12 @@ RETRO_API void retro_gogba_link_end(void) {
 	}
 	core = GoGBALinkEnd(gogbaLink);
 	gogbaLink = NULL;
+	core->setPeripheral(core, mPERIPH_ROTATION, &rotation);
+#ifdef M_CORE_GBA
+	if (core->platform(core) == mPLATFORM_GBA) {
+		core->setPeripheral(core, mPERIPH_GBA_LUMINANCE, &lux);
+	}
+#endif
 	unsigned i;
 	for (i = 0; i < GOGBA_LINK_MAX_PLAYERS; ++i) {
 		if (linkSaves[i]) {

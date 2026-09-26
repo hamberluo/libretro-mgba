@@ -25,7 +25,7 @@ struct retro_gogba_link_player {
 };
 
 // Call after retro_load_game (and after writing the local save into
-// RETRO_MEMORY_SAVE_RAM). Rebuilds every player's machine from the loaded ROM,
+// RETRO_MEMORY_SAVE_RAM; passing SAVE_RAM itself as saves[local_player] is fine). Rebuilds every player's machine from the loaded ROM,
 // loads saves[i] for player i -- saves[local_player] replaces what SAVE_RAM
 // holds -- and cold-boots them all joined by a link cable. SAVE_RAM keeps its
 // address and becomes the local player's save. Only the local player's machine

@@ -12,7 +12,7 @@ set -e
 cd "$1"
 {
 	find src/arm src/sm83 src/gba src/gb src/core src/util src/platform/libretro include \
-		\( -name '*.c' -o -name '*.h' \) -not -path '*/test/*'
+		\( -name '*.c' -o -name '*.h' \) -not -path '*/test/*' -not -name link_core_id.h
 	echo libretro-build/Makefile.common
 } | LC_ALL=C sort | while IFS= read -r f; do
 	printf '%s\n' "$f"

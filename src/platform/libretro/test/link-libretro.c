@@ -30,9 +30,21 @@ static int framesShown;
 // no COLOR_5_6_5, the format LINK_GBA_BACKDROP is written in).
 static int pixelsShown;
 
+// While set, the frontend reports a changed core option that alters emulation.
+static bool optionChanged;
+
 static bool env(unsigned cmd, void* data) {
-	UNUSED(cmd);
-	UNUSED(data);
+	if (optionChanged && cmd == RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE) {
+		*(bool*) data = true;
+		return true;
+	}
+	if (optionChanged && cmd == RETRO_ENVIRONMENT_GET_VARIABLE) {
+		struct retro_variable* var = data;
+		if (!strcmp(var->key, "mgba_allow_opposing_directions")) {
+			var->value = "yes";
+			return true;
+		}
+	}
 	return false;
 }
 static void video(const void* data, unsigned w, unsigned h, size_t pitch) {
@@ -92,12 +104,19 @@ int main(void) {
 	CHECK(retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) == saveRam, "SAVE_RAM moved when linking");
 	CHECK(((uint8_t*) saveRam)[saveSize - 1] == 0x5A, "local save not copied into SAVE_RAM");
 
+	// P1 holds left and right together; allowing that is an emulation option,
+	// so one device changing it mid-link must not reach the linked game.
 	int f;
+	optionChanged = true;
 	for (f = 0; f < 60; ++f) {
-		uint16_t masks[2] = { 0, (uint16_t) (1 << 8) };
+		uint16_t masks[2] = { (uint16_t) (1 << 6 | 1 << 7), (uint16_t) (1 << 8) };
 		retro_gogba_link_set_input(masks);
 		retro_run();
 	}
+	optionChanged = false;
+	uint16_t sent;
+	memcpy(&sent, (uint8_t*) retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) + (LINK_GBA_WORD0 - 0x02000000), 2);
+	CHECK(sent == 0x03FF, "an option change reached the linked game (P1 sent %04X)", sent);
 	CHECK(framesShown >= 59, "only %d frames shown while linked", framesShown);
 	CHECK(pixelsShown > 0, "the frames shown while linked were never drawn by the local core");
 	CHECK(retro_gogba_link_checksum() != 0, "checksum is 0 while linked");
@@ -131,14 +150,23 @@ int main(void) {
 	load();
 	CHECK(retro_gogba_link_begin(2, 0, saves, 1700000000000LL), "link_begin refused the second session");
 	for (f = 0; f < 60; ++f) {
-		uint16_t masks[2] = { 0, (uint16_t) (1 << 8) };
+		uint16_t masks[2] = { (uint16_t) (1 << 6 | 1 << 7), (uint16_t) (1 << 8) };
 		retro_gogba_link_set_input(masks);
 		retro_run();
 	}
 	retro_gogba_link_set_input(still);
 	retro_run();
-	CHECK(retro_gogba_link_checksum() == afterCalls, "reset or cheat changed a linked game (%08X, untouched run %08X)",
+	CHECK(retro_gogba_link_checksum() == afterCalls, "reset or cheat reached a linked game (%08X, untouched run %08X)",
 	      afterCalls, retro_gogba_link_checksum());
+	retro_unload_game();
+
+	// A frontend may pass SAVE_RAM itself as the local save.
+	load();
+	saveRam = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+	memset(saveRam, 0x42, 16);
+	struct retro_gogba_link_player aliased[2] = { { saveRam, saveSize }, { NULL, 0 } };
+	CHECK(retro_gogba_link_begin(2, 0, aliased, 0), "link_begin refused SAVE_RAM as the local save");
+	CHECK(((uint8_t*) saveRam)[0] == 0x42 && ((uint8_t*) saveRam)[15] == 0x42, "passing SAVE_RAM as the local save wiped it");
 	retro_unload_game();
 	retro_deinit();
 
