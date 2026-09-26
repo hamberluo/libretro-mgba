@@ -39,6 +39,7 @@ DEFINES=(
 	-DM_PI=3.14159265358979323846
 	-DMGBA_STANDALONE
 	-DPATH_MAX=1024
+	-fwrapv
 )
 
 # macOS has the real locale_t and the _l string functions, but declares
@@ -63,6 +64,7 @@ TESTS=(
 	"cheat-unpatch:src/platform/libretro/test/cheat-unpatch.c:src/gb/test/stubs.c src/platform/libretro/test/stubs.c src/core/cheats.c src/gba/cheats.c src/gba/cheats/gameshark.c src/gba/cheats/parv3.c src/gba/cheats/codebreaker.c src/util/string.c src/util/table.c src/util/vector.c"
 	"core-deinit:src/gb/test/core-deinit.c:src/gb/test/core-deinit-stubs.c src/core/*.c src/gb/*.c src/gb/mbc/*.c src/gb/renderers/*.c src/sm83/*.c src/util/*.c src/util/vfs/vfs-file.c src/util/vfs/vfs-mem.c"
 	"gba-core-deinit:src/gba/test/core-deinit.c:src/gba/test/core-deinit-stubs.c src/core/*.c src/gba/*.c src/gba/renderers/*.c src/gba/cheats/*.c src/gba/cart/*.c src/gba/sio/*.c src/arm/*.c src/gb/*.c src/gb/mbc/*.c src/gb/renderers/*.c src/sm83/*.c src/util/*.c src/util/vfs/vfs-file.c src/util/vfs/vfs-mem.c"
+	"lockstep-wrap:src/gba/test/lockstep-wrap.c:src/gba/test/core-deinit-stubs.c src/core/*.c src/gba/*.c src/gba/renderers/*.c src/gba/cheats/*.c src/gba/cart/*.c src/gba/sio/*.c src/arm/*.c src/gb/*.c src/gb/mbc/*.c src/gb/renderers/*.c src/sm83/*.c src/util/*.c src/util/vfs/vfs-file.c src/util/vfs/vfs-mem.c"
 )
 
 mkdir -p "$BUILD_DIR"
