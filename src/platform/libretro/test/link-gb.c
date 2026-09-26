@@ -28,19 +28,19 @@ static int checks;
 #define CHECK(cond, ...) do { ++checks; if (!(cond)) { ++failures; printf("FAIL: " __VA_ARGS__); printf("\n"); } } while (0)
 
 static uint8_t rom[LINK_GB_ROM_SIZE];
-static uint8_t saves[GOGBA_LINK_MAX_PLAYERS][SAVE_SIZE];
+static uint8_t saves[RETRO_LINK_MAX_PLAYERS][SAVE_SIZE];
 static mColor localVideo[256 * 224];
 
-static struct GoGBALink* makeLink(void) {
-	struct GoGBALinkSave s[GOGBA_LINK_MAX_PLAYERS];
+static struct RetroLink* makeLink(void) {
+	struct RetroLinkSave s[RETRO_LINK_MAX_PLAYERS];
 	unsigned i;
-	for (i = 0; i < GOGBA_LINK_MAX_PLAYERS; ++i) {
+	for (i = 0; i < RETRO_LINK_MAX_PLAYERS; ++i) {
 		memset(saves[i], 0xFF, SAVE_SIZE);
 		saves[i][0] = 0x11 * (i + 1); // 0x11 for P1, 0x22 for P2
 		s[i].data = saves[i];
 		s[i].size = SAVE_SIZE;
 	}
-	return GoGBALinkCreate(mPLATFORM_GB, rom, LINK_GB_ROM_SIZE, 2, 0, s, 1700000000000LL, localVideo, 256);
+	return RetroLinkCreate(mPLATFORM_GB, rom, LINK_GB_ROM_SIZE, 2, 0, s, 1700000000000LL, localVideo, 256);
 }
 
 static int32_t now(struct mCore* core) {
@@ -54,21 +54,21 @@ static void _timeout(int sig) {
 	_exit(1);
 }
 
-static void endAndFree(struct GoGBALink* link) {
-	struct mCore* local = GoGBALinkEnd(link);
+static void endAndFree(struct RetroLink* link) {
+	struct mCore* local = RetroLinkEnd(link);
 	mCoreConfigDeinit(&local->config);
 	local->deinit(local);
 }
 
 static uint32_t runAndChecksum(int frames) {
-	struct GoGBALink* link = makeLink();
+	struct RetroLink* link = makeLink();
 	int f;
 	for (f = 0; f < frames; ++f) {
 		uint16_t masks[2] = { (uint16_t) (f & 0xFF), (uint16_t) ((f * 7) & 0xFF) };
-		GoGBALinkSetInput(link, masks);
-		GoGBALinkRunFrame(link);
+		RetroLinkSetInput(link, masks);
+		RetroLinkRunFrame(link);
 	}
-	uint32_t crc = GoGBALinkChecksum(link);
+	uint32_t crc = RetroLinkChecksum(link);
 	endAndFree(link);
 	return crc;
 }
@@ -77,17 +77,17 @@ int main(void) {
 	linkBuildGbRom(rom, false);
 
 	// Pacing: one step is one frame, for both cores, however the slave idles.
-	struct GoGBALink* link = makeLink();
-	CHECK(link, "GoGBALinkCreate refused a valid GB ROM");
-	struct mCore* a = GoGBALinkCore(link, 0);
-	struct mCore* b = GoGBALinkCore(link, 1);
+	struct RetroLink* link = makeLink();
+	CHECK(link, "RetroLinkCreate refused a valid GB ROM");
+	struct mCore* a = RetroLinkCore(link, 0);
+	struct mCore* b = RetroLinkCore(link, 1);
 	int32_t startA = now(a), startB = now(b);
 	int32_t worstA = 0, worstB = 0;
 	int f;
 	for (f = 0; f < 3000; ++f) {
 		uint16_t masks[2] = { 0, 0 };
-		GoGBALinkSetInput(link, masks);
-		CHECK(GoGBALinkRunFrame(link), "frame %d: every core blocked", f);
+		RetroLinkSetInput(link, masks);
+		CHECK(RetroLinkRunFrame(link), "frame %d: every core blocked", f);
 		// How far past this step's frame each core ran: a core that finished
 		// its frame early must wait, or it runs into the next one and the
 		// local screen gets two frames in one step and none in the next.
@@ -108,7 +108,7 @@ int main(void) {
 	CHECK(a->busRead8(a, LINK_GB_SAVE0) == 0x11 && b->busRead8(b, LINK_GB_SAVE0) == 0x22,
 	      "saves crossed: P1 booted with %02X, P2 with %02X", a->busRead8(a, LINK_GB_SAVE0), b->busRead8(b, LINK_GB_SAVE0));
 	CHECK(saves[0][1] == a->busRead8(a, LINK_GB_COUNT), "P1's save buffer did not receive the cartridge RAM write");
-	struct mCore* alone = GoGBALinkEnd(link);
+	struct mCore* alone = RetroLinkEnd(link);
 	CHECK(!((struct GB*) alone->board)->memory.rotation, "local core still points at the freed link's tilt sensor");
 	mCoreConfigDeinit(&alone->config);
 	alone->deinit(alone);
@@ -119,12 +119,12 @@ int main(void) {
 	// Double speed: still one frame per step.
 	linkBuildGbRom(rom, true);
 	link = makeLink();
-	a = GoGBALinkCore(link, 0);
+	a = RetroLinkCore(link, 0);
 	startA = now(a);
 	for (f = 0; f < 600; ++f) {
 		uint16_t masks[2] = { 0, 0 };
-		GoGBALinkSetInput(link, masks);
-		GoGBALinkRunFrame(link);
+		RetroLinkSetInput(link, masks);
+		RetroLinkRunFrame(link);
 	}
 	ranA = now(a) - startA;
 	CHECK(((struct GB*) a->board)->doubleSpeed, "the ROM did not switch to double speed");
@@ -135,16 +135,16 @@ int main(void) {
 	// its frame instead of letting a halted core skip ahead for ever.
 	linkBuildGbHaltRom(rom);
 	link = makeLink();
-	a = GoGBALinkCore(link, 0);
-	b = GoGBALinkCore(link, 1);
+	a = RetroLinkCore(link, 0);
+	b = RetroLinkCore(link, 1);
 	startA = now(a);
 	startB = now(b);
 	signal(SIGALRM, _timeout);
 	alarm(20);
 	for (f = 0; f < 60; ++f) {
 		uint16_t masks[2] = { 0, 0 };
-		GoGBALinkSetInput(link, masks);
-		GoGBALinkRunFrame(link);
+		RetroLinkSetInput(link, masks);
+		RetroLinkRunFrame(link);
 	}
 	alarm(0);
 	ranA = now(a) - startA;

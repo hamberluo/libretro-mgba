@@ -27,23 +27,23 @@ static int checks;
 #define CHECK(cond, ...) do { ++checks; if (!(cond)) { ++failures; printf("FAIL: " __VA_ARGS__); printf("\n"); } } while (0)
 
 static uint8_t rom[LINK_GBA_ROM_SIZE];
-static uint8_t saves[GOGBA_LINK_MAX_PLAYERS][0x20000];
+static uint8_t saves[RETRO_LINK_MAX_PLAYERS][0x20000];
 static mColor localVideo[256 * 224];
 
-static struct GoGBALink* makeLink(const uint8_t* image, unsigned local) {
-	struct GoGBALinkSave s[GOGBA_LINK_MAX_PLAYERS];
+static struct RetroLink* makeLink(const uint8_t* image, unsigned local) {
+	struct RetroLinkSave s[RETRO_LINK_MAX_PLAYERS];
 	unsigned i;
-	for (i = 0; i < GOGBA_LINK_MAX_PLAYERS; ++i) {
+	for (i = 0; i < RETRO_LINK_MAX_PLAYERS; ++i) {
 		memset(saves[i], 0xFF, sizeof(saves[i]));
 		s[i].data = saves[i];
 		s[i].size = sizeof(saves[i]);
 	}
 	memset(localVideo, 0, sizeof(localVideo));
-	return GoGBALinkCreate(mPLATFORM_GBA, image, LINK_GBA_ROM_SIZE, 2, local, s, 1700000000000LL, localVideo, 256);
+	return RetroLinkCreate(mPLATFORM_GBA, image, LINK_GBA_ROM_SIZE, 2, local, s, 1700000000000LL, localVideo, 256);
 }
 
-static void endAndFree(struct GoGBALink* link) {
-	struct mCore* local = GoGBALinkEnd(link);
+static void endAndFree(struct RetroLink* link) {
+	struct mCore* local = RetroLinkEnd(link);
 	mCoreConfigDeinit(&local->config);
 	local->deinit(local);
 }
@@ -54,14 +54,14 @@ static uint16_t input(unsigned frame, unsigned player) {
 }
 
 static void checksums(uint32_t out[10]) {
-	struct GoGBALink* link = makeLink(rom, 0);
+	struct RetroLink* link = makeLink(rom, 0);
 	unsigned frame;
 	for (frame = 0; frame < 600; ++frame) {
 		uint16_t masks[2] = { input(frame, 0), input(frame, 1) };
-		GoGBALinkSetInput(link, masks);
-		GoGBALinkRunFrame(link);
+		RetroLinkSetInput(link, masks);
+		RetroLinkRunFrame(link);
 		if (frame % 60 == 59) {
-			out[frame / 60] = GoGBALinkChecksum(link);
+			out[frame / 60] = RetroLinkChecksum(link);
 		}
 	}
 	endAndFree(link);
@@ -71,26 +71,26 @@ int main(void) {
 	linkBuildGbaRom(rom);
 
 	// Traffic and input routing.
-	struct GoGBALink* link = makeLink(rom, 1);
-	CHECK(link, "GoGBALinkCreate refused a valid GBA ROM");
-	CHECK(GoGBALinkLocalCore(link) == GoGBALinkCore(link, 1), "local core is not player 1's");
-	struct mCore* p1 = GoGBALinkCore(link, 0);
-	struct mCore* p2 = GoGBALinkCore(link, 1);
+	struct RetroLink* link = makeLink(rom, 1);
+	CHECK(link, "RetroLinkCreate refused a valid GBA ROM");
+	CHECK(RetroLinkLocalCore(link) == RetroLinkCore(link, 1), "local core is not player 1's");
+	struct mCore* p1 = RetroLinkCore(link, 0);
+	struct mCore* p2 = RetroLinkCore(link, 1);
 	CHECK(!((struct GBA*) p1->board)->memory.fullBios, "link mode loaded a BIOS");
 	CHECK(p1->rtc.override == RTC_FAKE_EPOCH && p1->rtc.value == 1700000000000LL, "RTC is not the shared fake epoch");
 
 	uint16_t masks[2] = { 0, JOYPAD_A };
 	int f;
 	for (f = 0; f < 5; ++f) {
-		GoGBALinkSetInput(link, masks);
-		CHECK(GoGBALinkRunFrame(link), "frame %d: every core blocked", f);
+		RetroLinkSetInput(link, masks);
+		CHECK(RetroLinkRunFrame(link), "frame %d: every core blocked", f);
 	}
 	CHECK(p1->busRead16(p1, LINK_GBA_WORD1) == 0x03FE, "P2's A did not reach P1 (SIOMULTI1 %04X)", p1->busRead16(p1, LINK_GBA_WORD1));
 	masks[0] = JOYPAD_B;
 	masks[1] = 0;
 	for (f = 0; f < 5; ++f) {
-		GoGBALinkSetInput(link, masks);
-		GoGBALinkRunFrame(link);
+		RetroLinkSetInput(link, masks);
+		RetroLinkRunFrame(link);
 	}
 	CHECK(p2->busRead16(p2, LINK_GBA_WORD0) == 0x03FD, "P1's B did not reach P2 (SIOMULTI0 %04X)", p2->busRead16(p2, LINK_GBA_WORD0));
 	CHECK(p1->busRead32(p1, LINK_GBA_COUNT) > 300, "only %u transfers in 10 frames", p1->busRead32(p1, LINK_GBA_COUNT));
@@ -114,13 +114,13 @@ int main(void) {
 	static uint8_t idle[LINK_GBA_ROM_SIZE];
 	linkBuildGbaIdleRom(idle);
 	link = makeLink(idle, 0);
-	struct mCore* a = GoGBALinkCore(link, 0);
-	struct mCore* b = GoGBALinkCore(link, 1);
+	struct mCore* a = RetroLinkCore(link, 0);
+	struct mCore* b = RetroLinkCore(link, 1);
 	int32_t start = mTimingCurrentTime(&((struct GBA*) a->board)->timing);
 	for (f = 0; f < 300; ++f) {
 		masks[0] = masks[1] = 0;
-		GoGBALinkSetInput(link, masks);
-		CHECK(GoGBALinkRunFrame(link), "idle game: every core blocked at frame %d", f);
+		RetroLinkSetInput(link, masks);
+		CHECK(RetroLinkRunFrame(link), "idle game: every core blocked at frame %d", f);
 	}
 	int32_t ran = mTimingCurrentTime(&((struct GBA*) a->board)->timing) - start;
 	CHECK(ran >= 300 * FRAME_TICKS && ran < 302 * FRAME_TICKS, "idle game: 300 steps ran %d ticks", ran);
@@ -132,10 +132,10 @@ int main(void) {
 	link = makeLink(rom, 1);
 	for (f = 0; f < 3; ++f) {
 		masks[0] = masks[1] = 0;
-		GoGBALinkSetInput(link, masks);
-		GoGBALinkRunFrame(link);
+		RetroLinkSetInput(link, masks);
+		RetroLinkRunFrame(link);
 	}
-	struct mCore* alone = GoGBALinkEnd(link);
+	struct mCore* alone = RetroLinkEnd(link);
 	uint32_t before = alone->frameCounter(alone);
 	for (f = 0; f < 60; ++f) {
 		alone->runFrame(alone);

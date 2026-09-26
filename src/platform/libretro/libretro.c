@@ -43,13 +43,13 @@ FS_Archive sdmcArchive;
 #endif
 
 #include "libretro_core_options.h"
-#include "libretro_gogba.h"
+#include "libretro_link.h"
 #include "link.h"
 
-#ifdef HAVE_GOGBA_LINK_CORE_ID_H
+#ifdef HAVE_LINK_CORE_ID_H
 #include "link_core_id.h"
 #else
-#define GOGBA_LINK_CORE_ID 0
+#define RETRO_LINK_CORE_ID 0
 #endif
 
 #define GBA_RESAMPLED_RATE 65536
@@ -106,8 +106,8 @@ static size_t dataSize;
 static void* savedata;
 static size_t savedataSize;
 static char romPath[PATH_MAX];      // for link mode when the frontend passed a path
-static struct GoGBALink* gogbaLink; // not `link`: that would clash with POSIX link() from <unistd.h>
-static void* linkSaves[GOGBA_LINK_MAX_PLAYERS]; // remote players' save buffers
+static struct RetroLink* activeLink; // not `link`: that would clash with POSIX link() from <unistd.h>
+static void* linkSaves[RETRO_LINK_MAX_PLAYERS]; // remote players' save buffers
 static struct mAVStream stream;
 static bool sensorsInitDone;
 static bool rumbleInitDone;
@@ -1587,7 +1587,7 @@ void retro_run(void) {
 			.value = 0
 		};
 		// Emulation options are pinned while linked; one device changing them desyncs.
-		if (!gogbaLink && environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+		if (!activeLink && environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
 			mCoreConfigSetIntValue(&core->config, "allowOpposingDirections", strcmp(var.value, "yes") == 0);
 			core->reloadConfigOption(core, "allowOpposingDirections", NULL);
 		}
@@ -1603,7 +1603,7 @@ void retro_run(void) {
 #endif
 	}
 
-	if (!gogbaLink) {
+	if (!activeLink) {
 		keys = 0;
 		unsigned i;
 		if (useBitmasks) {
@@ -1709,8 +1709,8 @@ void retro_run(void) {
       updateAudioLatency = false;
    }
 
-	if (gogbaLink) {
-		if (!GoGBALinkRunFrame(gogbaLink) && logCallback) {
+	if (activeLink) {
+		if (!RetroLinkRunFrame(activeLink) && logCallback) {
 			logCallback(RETRO_LOG_ERROR, "Link: every machine is blocked on the cable\n");
 		}
 	} else {
@@ -1980,7 +1980,7 @@ static void _setupMaps(struct mCore* core) {
 }
 
 void retro_reset(void) {
-	if (gogbaLink) {
+	if (activeLink) {
 		return;
 	}
 	core->reset(core);
@@ -2215,8 +2215,8 @@ void retro_unload_game(void) {
 	if (!core) {
 		return;
 	}
-	if (gogbaLink) {
-		retro_gogba_link_end();
+	if (activeLink) {
+		retro_link_end();
 	}
 	mCoreConfigDeinit(&core->config);
 	core->deinit(core);
@@ -2231,7 +2231,7 @@ void retro_unload_game(void) {
 }
 
 size_t retro_serialize_size(void) {
-	if (gogbaLink) {
+	if (activeLink) {
 		return 0;
 	}
 	if (deferredSetup) {
@@ -2245,7 +2245,7 @@ size_t retro_serialize_size(void) {
 }
 
 bool retro_serialize(void* data, size_t size) {
-	if (gogbaLink) {
+	if (activeLink) {
 		return false;
 	}
 	if (deferredSetup) {
@@ -2266,7 +2266,7 @@ bool retro_serialize(void* data, size_t size) {
 }
 
 bool retro_unserialize(const void* data, size_t size) {
-	if (gogbaLink) {
+	if (activeLink) {
 		return false;
 	}
 	if (deferredSetup) {
@@ -2313,7 +2313,7 @@ void retro_cheat_reset(void) {
  */
 static void _cheatSetWithType(const char* code, int type) {
 	// Both cheat entry points land here; a cheat would desync a link.
-	if (gogbaLink) {
+	if (activeLink) {
 		return;
 	}
 	// No core means the code was not accepted, which is what the frontend
@@ -2825,9 +2825,9 @@ static void _setupLocalCore(void) {
 	_setupMaps(core);
 }
 
-RETRO_API bool retro_gogba_link_begin(unsigned players, unsigned localPlayer,
-                                      const struct retro_gogba_link_player* saves, int64_t rtcEpochMs) {
-	if (!core || gogbaLink || !saves || players < 2 || players > GOGBA_LINK_MAX_PLAYERS || localPlayer >= players) {
+RETRO_API bool retro_link_begin(unsigned players, unsigned localPlayer,
+                                      const struct retro_link_player* saves, int64_t rtcEpochMs) {
+	if (!core || activeLink || !saves || players < 2 || players > RETRO_LINK_MAX_PLAYERS || localPlayer >= players) {
 		return false;
 	}
 	if (deferredSetup) {
@@ -2836,7 +2836,7 @@ RETRO_API bool retro_gogba_link_begin(unsigned players, unsigned localPlayer,
 	if (!_linkRomBytes()) {
 		return false;
 	}
-	struct GoGBALinkSave linkSave[GOGBA_LINK_MAX_PLAYERS];
+	struct RetroLinkSave linkSave[RETRO_LINK_MAX_PLAYERS];
 	unsigned i;
 	for (i = 0; i < players; ++i) {
 		void* buffer = i == localPlayer ? savedata : (linkSaves[i] = anonymousMemoryMap(savedataSize));
@@ -2849,7 +2849,7 @@ RETRO_API bool retro_gogba_link_begin(unsigned players, unsigned localPlayer,
 		linkSave[i].data = buffer;
 		linkSave[i].size = savedataSize;
 	}
-	struct GoGBALink* created = GoGBALinkCreate(core->platform(core), data, dataSize, players, localPlayer,
+	struct RetroLink* created = RetroLinkCreate(core->platform(core), data, dataSize, players, localPlayer,
 	                                            linkSave, rtcEpochMs, outputBuffer, VIDEO_WIDTH_MAX);
 	if (!created) {
 		for (i = 0; i < players; ++i) {
@@ -2864,32 +2864,32 @@ RETRO_API bool retro_gogba_link_begin(unsigned players, unsigned localPlayer,
 	// `savedata` stays the SAVE_RAM buffer the frontend holds.
 	mCoreConfigDeinit(&core->config);
 	core->deinit(core);
-	gogbaLink = created;
-	core = GoGBALinkLocalCore(gogbaLink);
+	activeLink = created;
+	core = RetroLinkLocalCore(activeLink);
 	_setupLocalCore();
 	return true;
 }
 
-RETRO_API void retro_gogba_link_set_input(const uint16_t* joypadMasks) {
-	if (gogbaLink && joypadMasks) {
-		GoGBALinkSetInput(gogbaLink, joypadMasks);
+RETRO_API void retro_link_set_input(const uint16_t* joypadMasks) {
+	if (activeLink && joypadMasks) {
+		RetroLinkSetInput(activeLink, joypadMasks);
 	}
 }
 
-RETRO_API uint32_t retro_gogba_link_checksum(void) {
-	return gogbaLink ? GoGBALinkChecksum(gogbaLink) : 0;
+RETRO_API uint32_t retro_link_checksum(void) {
+	return activeLink ? RetroLinkChecksum(activeLink) : 0;
 }
 
-RETRO_API uint64_t retro_gogba_link_core_id(void) {
-	return GOGBA_LINK_CORE_ID;
+RETRO_API uint64_t retro_link_core_id(void) {
+	return RETRO_LINK_CORE_ID;
 }
 
-RETRO_API void retro_gogba_link_end(void) {
-	if (!gogbaLink) {
+RETRO_API void retro_link_end(void) {
+	if (!activeLink) {
 		return;
 	}
-	core = GoGBALinkEnd(gogbaLink);
-	gogbaLink = NULL;
+	core = RetroLinkEnd(activeLink);
+	activeLink = NULL;
 	core->setPeripheral(core, mPERIPH_ROTATION, &rotation);
 #ifdef M_CORE_GBA
 	if (core->platform(core) == mPLATFORM_GBA) {
@@ -2897,7 +2897,7 @@ RETRO_API void retro_gogba_link_end(void) {
 	}
 #endif
 	unsigned i;
-	for (i = 0; i < GOGBA_LINK_MAX_PLAYERS; ++i) {
+	for (i = 0; i < RETRO_LINK_MAX_PLAYERS; ++i) {
 		if (linkSaves[i]) {
 			mappedMemoryFree(linkSaves[i], savedataSize);
 			linkSaves[i] = NULL;

@@ -60,16 +60,16 @@ static uint16_t parseKeys(const char* s) {
 	return mask;
 }
 
-static void step(struct GoGBALink* link, int frames) {
+static void step(struct RetroLink* link, int frames) {
 	int f;
 	for (f = 0; f < frames; ++f) {
-		GoGBALinkSetInput(link, masks);
-		if (!GoGBALinkRunFrame(link)) {
+		RetroLinkSetInput(link, masks);
+		if (!RetroLinkRunFrame(link)) {
 			printf("DEADLOCK\n");
 			exit(1);
 		}
 #ifdef M_CORE_GBA
-		struct mCore* p1 = GoGBALinkCore(link, 0);
+		struct mCore* p1 = RetroLinkCore(link, 0);
 		if (p1->platform(p1) == mPLATFORM_GBA) {
 			modesSeen |= 1u << ((struct GBA*) p1->board)->sio.mode;
 		}
@@ -77,10 +77,10 @@ static void step(struct GoGBALink* link, int frames) {
 	}
 }
 
-static void shot(struct GoGBALink* link, const char* name) {
+static void shot(struct RetroLink* link, const char* name) {
 	char path[512];
 	unsigned w, h;
-	GoGBALinkCore(link, 0)->currentVideoSize(GoGBALinkCore(link, 0), &w, &h);
+	RetroLinkCore(link, 0)->currentVideoSize(RetroLinkCore(link, 0), &w, &h);
 	snprintf(path, sizeof(path), "%s.ppm", name);
 	FILE* f = fopen(path, "wb");
 	fprintf(f, "P6\n%u %u\n255\n", w * 2 + 8, h);
@@ -122,25 +122,25 @@ int main(int argc, char** argv) {
 	vf->close(vf);
 	static uint8_t saveBuf[2][0x20000];
 	memset(saveBuf, 0xFF, sizeof(saveBuf));
-	struct GoGBALinkSave saves[2] = { { saveBuf[0], sizeof(saveBuf[0]) }, { saveBuf[1], sizeof(saveBuf[1]) } };
-	struct GoGBALink* link = GoGBALinkCreate(platform, rom, size, 2, 0, saves, 1700000000000LL, video[0], 256);
+	struct RetroLinkSave saves[2] = { { saveBuf[0], sizeof(saveBuf[0]) }, { saveBuf[1], sizeof(saveBuf[1]) } };
+	struct RetroLink* link = RetroLinkCreate(platform, rom, size, 2, 0, saves, 1700000000000LL, video[0], 256);
 	if (!link) {
 		fprintf(stderr, "link refused the ROM\n");
 		return 1;
 	}
 	// Show both screens for the harness: the remote core draws nothing by
 	// design, so point it at a buffer and re-enable its drawing.
-	GoGBALinkCore(link, 1)->setVideoBuffer(GoGBALinkCore(link, 1), video[1], 256);
+	RetroLinkCore(link, 1)->setVideoBuffer(RetroLinkCore(link, 1), video[1], 256);
 #ifdef M_CORE_GBA
 	if (platform == mPLATFORM_GBA) {
-		((struct GBA*) GoGBALinkCore(link, 1)->board)->video.frameskip = 0;
-		((struct GBA*) GoGBALinkCore(link, 1)->board)->video.frameskipCounter = 0;
+		((struct GBA*) RetroLinkCore(link, 1)->board)->video.frameskip = 0;
+		((struct GBA*) RetroLinkCore(link, 1)->board)->video.frameskipCounter = 0;
 	}
 #endif
 #ifdef M_CORE_GB
 	if (platform == mPLATFORM_GB) {
-		((struct GB*) GoGBALinkCore(link, 1)->board)->video.frameskip = 0;
-		((struct GB*) GoGBALinkCore(link, 1)->board)->video.frameskipCounter = 0;
+		((struct GB*) RetroLinkCore(link, 1)->board)->video.frameskip = 0;
+		((struct GB*) RetroLinkCore(link, 1)->board)->video.frameskipCounter = 0;
 	}
 #endif
 
@@ -161,10 +161,10 @@ int main(int argc, char** argv) {
 		} else if (!strcmp(op, "shot")) {
 			shot(link, a1);
 		} else if (!strcmp(op, "info")) {
-			struct mCore* a = GoGBALinkCore(link, 0);
-			struct mCore* b = GoGBALinkCore(link, 1);
+			struct mCore* a = RetroLinkCore(link, 0);
+			struct mCore* b = RetroLinkCore(link, 1);
 			printf("frames %u / %u, checksum %08X, SIO modes seen 0x%X", a->frameCounter(a), b->frameCounter(b),
-			       GoGBALinkChecksum(link), modesSeen);
+			       RetroLinkChecksum(link), modesSeen);
 #ifdef M_CORE_GB
 			if (platform == mPLATFORM_GB) {
 				printf(", double speed %d / %d", ((struct GB*) a->board)->doubleSpeed, ((struct GB*) b->board)->doubleSpeed);
@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
 			printf("\n");
 		}
 	}
-	struct mCore* local = GoGBALinkEnd(link);
+	struct mCore* local = RetroLinkEnd(link);
 	mCoreConfigDeinit(&local->config);
 	local->deinit(local);
 	free(rom);

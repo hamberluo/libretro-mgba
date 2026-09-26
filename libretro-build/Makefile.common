@@ -174,6 +174,6 @@ endif
 # and only when it changes: incremental builds track headers, not flags.
 LINK_CORE_ID := $(shell sh $(CORE_DIR)/libretro-build/link_core_id.sh $(CORE_DIR))
 LINK_CORE_ID_H := $(CORE_DIR)/src/platform/libretro/link_core_id.h
-LINK_CORE_ID_DEFINE := \#define GOGBA_LINK_CORE_ID 0x$(LINK_CORE_ID)ULL
+LINK_CORE_ID_DEFINE := \#define RETRO_LINK_CORE_ID 0x$(LINK_CORE_ID)ULL
 $(shell echo '$(LINK_CORE_ID_DEFINE)' | cmp -s - '$(LINK_CORE_ID_H)' || echo '$(LINK_CORE_ID_DEFINE)' > '$(LINK_CORE_ID_H)')
-RETRODEFS += -DHAVE_GOGBA_LINK_CORE_ID_H
+RETRODEFS += -DHAVE_LINK_CORE_ID_H

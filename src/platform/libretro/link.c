@@ -29,9 +29,9 @@
 
 #include "libretro.h"
 
-struct GoGBALinkPlayer {
+struct RetroLinkPlayer {
 	struct mLockstepUser user; // first: the GBA driver hands it back to our callbacks
-	struct GoGBALink* link;
+	struct RetroLink* link;
 	unsigned index;
 	struct mCore* core;
 	mColor* scratchVideo;      // remote cores need a buffer even though they never draw
@@ -48,12 +48,12 @@ struct GoGBALinkPlayer {
 #endif
 };
 
-struct GoGBALink {
+struct RetroLink {
 	enum mPlatform platform;
 	unsigned players;
 	unsigned localPlayer;
-	struct GoGBALinkPlayer player[GOGBA_LINK_MAX_PLAYERS];
-	struct GoGBALinkPlayer* running; // inside runLoop right now, if anyone
+	struct RetroLinkPlayer player[RETRO_LINK_MAX_PLAYERS];
+	struct RetroLinkPlayer* running; // inside runLoop right now, if anyone
 	struct mRotationSource rotation;
 #ifdef M_CORE_GBA
 	struct GBALuminanceSource lux;
@@ -61,7 +61,7 @@ struct GoGBALink {
 #endif
 #ifdef M_CORE_GB
 	struct GBSIOLockstep gbLockstep;
-	int32_t gbPosted[GOGBA_LINK_MAX_PLAYERS]; // cycles each slave may run, by lockstep id
+	int32_t gbPosted[RETRO_LINK_MAX_PLAYERS]; // cycles each slave may run, by lockstep id
 	unsigned gbWaitMask;
 #endif
 };
@@ -87,7 +87,7 @@ static uint8_t _neutralLux(struct GBALuminanceSource* source) {
 }
 #endif
 
-static struct mTiming* _timing(struct GoGBALinkPlayer* player) {
+static struct mTiming* _timing(struct RetroLinkPlayer* player) {
 	switch (player->link->platform) {
 #ifdef M_CORE_GBA
 	case mPLATFORM_GBA:
@@ -105,7 +105,7 @@ static struct mTiming* _timing(struct GoGBALinkPlayer* player) {
 // Makes the core's current runLoop return as soon as it can. A halted core
 // otherwise keeps skipping from event to event inside one runLoop until an
 // interrupt wakes it -- on the cable, one only the other core can send.
-static void _breakRunLoop(struct GoGBALinkPlayer* player) {
+static void _breakRunLoop(struct RetroLinkPlayer* player) {
 	switch (player->link->platform) {
 #ifdef M_CORE_GBA
 	case mPLATFORM_GBA:
@@ -126,11 +126,11 @@ static void _breakRunLoop(struct GoGBALinkPlayer* player) {
 // core makes whoever is running yield, as another thread would simply start
 // running. Without it, a halted core that just released another one keeps
 // skipping ahead alone.
-static void _park(struct GoGBALinkPlayer* player) {
+static void _park(struct RetroLinkPlayer* player) {
 	player->asleep = true;
 }
 
-static void _wake(struct GoGBALinkPlayer* player) {
+static void _wake(struct RetroLinkPlayer* player) {
 	player->asleep = false;
 	if (player->link->running && player->link->running != player) {
 		_breakRunLoop(player->link->running);
@@ -138,19 +138,19 @@ static void _wake(struct GoGBALinkPlayer* player) {
 }
 
 static void _playerSleep(struct mLockstepUser* user) {
-	_park((struct GoGBALinkPlayer*) user);
+	_park((struct RetroLinkPlayer*) user);
 }
 
 static void _playerWake(struct mLockstepUser* user) {
-	_wake((struct GoGBALinkPlayer*) user);
+	_wake((struct RetroLinkPlayer*) user);
 }
 
 static int _playerRequestedId(struct mLockstepUser* user) {
-	return ((struct GoGBALinkPlayer*) user)->index;
+	return ((struct RetroLinkPlayer*) user)->index;
 }
 
 #ifdef M_CORE_GB
-static struct GoGBALinkPlayer* _gbPlayerById(struct GoGBALink* link, int id) {
+static struct RetroLinkPlayer* _gbPlayerById(struct RetroLink* link, int id) {
 	// The node that starts a transfer takes id 0, so ids and players can swap.
 	unsigned i;
 	for (i = 0; i < link->players; ++i) {
@@ -161,14 +161,14 @@ static struct GoGBALinkPlayer* _gbPlayerById(struct GoGBALink* link, int id) {
 	return NULL;
 }
 
-static void _gbPark(struct GoGBALinkPlayer* player) {
+static void _gbPark(struct RetroLinkPlayer* player) {
 	struct SM83Core* cpu = player->core->cpu;
 	cpu->nextEvent = cpu->cycles; // leave runLoop so the scheduler can switch cores
 	_park(player);
 }
 
 static bool _gbSignal(struct mLockstep* lockstep, unsigned mask) {
-	struct GoGBALink* link = lockstep->context;
+	struct RetroLink* link = lockstep->context;
 	int id;
 	for (id = 0; id < (int) link->players; ++id) {
 		if (!(mask & (1u << id))) {
@@ -190,7 +190,7 @@ static bool _gbSignal(struct mLockstep* lockstep, unsigned mask) {
 }
 
 static bool _gbWait(struct mLockstep* lockstep, unsigned mask) {
-	struct GoGBALink* link = lockstep->context;
+	struct RetroLink* link = lockstep->context;
 	int id;
 	link->gbWaitMask |= mask;
 	for (id = 1; id < (int) link->players; ++id) {
@@ -205,7 +205,7 @@ static bool _gbWait(struct mLockstep* lockstep, unsigned mask) {
 }
 
 static void _gbAddCycles(struct mLockstep* lockstep, int id, int32_t cycles) {
-	struct GoGBALink* link = lockstep->context;
+	struct RetroLink* link = lockstep->context;
 	if (id != 0) {
 		// A slave granting itself cycles while idle is dropped. Qt's frontend
 		// ran each GB on a thread paced to real time, which bounded that grant;
@@ -222,7 +222,7 @@ static void _gbAddCycles(struct mLockstep* lockstep, int id, int32_t cycles) {
 }
 
 static int32_t _gbUseCycles(struct mLockstep* lockstep, int id, int32_t cycles) {
-	struct GoGBALink* link = lockstep->context;
+	struct RetroLink* link = lockstep->context;
 	link->gbPosted[id] -= cycles;
 	if (link->gbPosted[id] <= 0) {
 		_gbPark(_gbPlayerById(link, id));
@@ -231,7 +231,7 @@ static int32_t _gbUseCycles(struct mLockstep* lockstep, int id, int32_t cycles) 
 }
 
 static int32_t _gbUnusedCycles(struct mLockstep* lockstep, int id) {
-	return ((struct GoGBALink*) lockstep->context)->gbPosted[id];
+	return ((struct RetroLink*) lockstep->context)->gbPosted[id];
 }
 
 static void _gbUnload(struct mLockstep* lockstep, int id) {
@@ -255,7 +255,7 @@ static void _configure(struct mCore* core) {
 	mCoreLoadConfig(core);
 }
 
-static void _neverDraw(struct GoGBALinkPlayer* player) {
+static void _neverDraw(struct RetroLinkPlayer* player) {
 	switch (player->link->platform) {
 #ifdef M_CORE_GBA
 	case mPLATFORM_GBA:
@@ -274,7 +274,7 @@ static void _neverDraw(struct GoGBALinkPlayer* player) {
 	}
 }
 
-static void _destroyPlayer(struct GoGBALinkPlayer* player) {
+static void _destroyPlayer(struct RetroLinkPlayer* player) {
 	if (player->core) {
 		mCoreConfigDeinit(&player->core->config);
 		player->core->deinit(player->core);
@@ -284,8 +284,8 @@ static void _destroyPlayer(struct GoGBALinkPlayer* player) {
 	player->scratchVideo = NULL;
 }
 
-static bool _plugIn(struct GoGBALinkPlayer* player) {
-	struct GoGBALink* link = player->link;
+static bool _plugIn(struct RetroLinkPlayer* player) {
+	struct RetroLink* link = player->link;
 	struct mCore* core = player->core;
 	switch (link->platform) {
 #ifdef M_CORE_GBA
@@ -313,14 +313,14 @@ static bool _plugIn(struct GoGBALinkPlayer* player) {
 	}
 }
 
-struct GoGBALink* GoGBALinkCreate(enum mPlatform platform, const void* rom, size_t romSize,
+struct RetroLink* RetroLinkCreate(enum mPlatform platform, const void* rom, size_t romSize,
                                   unsigned players, unsigned localPlayer,
-                                  const struct GoGBALinkSave* saves, int64_t rtcEpochMs,
+                                  const struct RetroLinkSave* saves, int64_t rtcEpochMs,
                                   mColor* localVideo, size_t localStride) {
-	if (players < 2 || players > GOGBA_LINK_MAX_PLAYERS || localPlayer >= players || !rom || !saves || !localVideo) {
+	if (players < 2 || players > RETRO_LINK_MAX_PLAYERS || localPlayer >= players || !rom || !saves || !localVideo) {
 		return NULL;
 	}
-	struct GoGBALink* link = calloc(1, sizeof(*link));
+	struct RetroLink* link = calloc(1, sizeof(*link));
 	link->platform = platform;
 	link->players = players;
 	link->localPlayer = localPlayer;
@@ -344,7 +344,7 @@ struct GoGBALink* GoGBALinkCreate(enum mPlatform platform, const void* rom, size
 
 	unsigned i;
 	for (i = 0; i < players; ++i) {
-		struct GoGBALinkPlayer* player = &link->player[i];
+		struct RetroLinkPlayer* player = &link->player[i];
 		player->link = link;
 		player->index = i;
 		player->turboDown = true; // libretro.c's cycleturbo starts pressed
@@ -397,17 +397,17 @@ fail:
 	return NULL;
 }
 
-struct mCore* GoGBALinkCore(struct GoGBALink* link, unsigned player) {
+struct mCore* RetroLinkCore(struct RetroLink* link, unsigned player) {
 	return player < link->players ? link->player[player].core : NULL;
 }
 
-struct mCore* GoGBALinkLocalCore(struct GoGBALink* link) {
+struct mCore* RetroLinkLocalCore(struct RetroLink* link) {
 	return link->player[link->localPlayer].core;
 }
 
 // libretro.c's keymap, plus its turbo cadence kept per player so each core
 // sees its own player's turbo exactly as it would in single player.
-static uint16_t _keysFromMask(struct GoGBALinkPlayer* player, uint16_t mask) {
+static uint16_t _keysFromMask(struct RetroLinkPlayer* player, uint16_t mask) {
 	uint16_t keys = 0;
 	size_t i;
 	for (i = 0; i < sizeof(_keymap) / sizeof(*_keymap); ++i) {
@@ -432,16 +432,16 @@ static uint16_t _keysFromMask(struct GoGBALinkPlayer* player, uint16_t mask) {
 	return keys;
 }
 
-void GoGBALinkSetInput(struct GoGBALink* link, const uint16_t* joypadMasks) {
+void RetroLinkSetInput(struct RetroLink* link, const uint16_t* joypadMasks) {
 	unsigned i;
 	for (i = 0; i < link->players; ++i) {
-		struct GoGBALinkPlayer* player = &link->player[i];
+		struct RetroLinkPlayer* player = &link->player[i];
 		player->core->setKeys(player->core, _keysFromMask(player, joypadMasks[i]));
 	}
 }
 
-bool GoGBALinkRunFrame(struct GoGBALink* link) {
-	int32_t target[GOGBA_LINK_MAX_PLAYERS];
+bool RetroLinkRunFrame(struct RetroLink* link) {
+	int32_t target[RETRO_LINK_MAX_PLAYERS];
 	unsigned i;
 	for (i = 0; i < link->players; ++i) {
 		// Absolute deadlines: counting from wherever the last frame overshot
@@ -467,7 +467,7 @@ bool GoGBALinkRunFrame(struct GoGBALink* link) {
 		int pass;
 		for (pass = 0; pass < 2 && !ran; ++pass) {
 			for (i = 0; i < link->players; ++i) {
-				struct GoGBALinkPlayer* player = &link->player[i];
+				struct RetroLinkPlayer* player = &link->player[i];
 				if (player->asleep) {
 					continue;
 				}
@@ -492,7 +492,7 @@ bool GoGBALinkRunFrame(struct GoGBALink* link) {
 	return true;
 }
 
-uint32_t GoGBALinkChecksum(struct GoGBALink* link) {
+uint32_t RetroLinkChecksum(struct RetroLink* link) {
 	uint32_t crc = 0;
 	unsigned i;
 	for (i = 0; i < link->players; ++i) {
@@ -523,7 +523,7 @@ uint32_t GoGBALinkChecksum(struct GoGBALink* link) {
 	}
 	return crc;
 }
-static void _unplug(struct GoGBALinkPlayer* player) {
+static void _unplug(struct RetroLinkPlayer* player) {
 	switch (player->link->platform) {
 #ifdef M_CORE_GBA
 	case mPLATFORM_GBA:
@@ -544,7 +544,7 @@ static void _unplug(struct GoGBALinkPlayer* player) {
 	player->asleep = false;
 }
 
-struct mCore* GoGBALinkEnd(struct GoGBALink* link) {
+struct mCore* RetroLinkEnd(struct RetroLink* link) {
 	unsigned i;
 	for (i = 0; i < link->players; ++i) {
 		_unplug(&link->player[i]);

@@ -9,7 +9,7 @@
 // refused while linked, and begin / end / unload cannot be misused into a
 // use-after-free (needs ASan).
 
-#include "../libretro_gogba.h"
+#include "../libretro_link.h"
 #include "link-rom.h"
 
 #include <mgba-util/common.h>
@@ -17,8 +17,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifndef GOGBA_LINK_CORE_ID
-#define GOGBA_LINK_CORE_ID 0
+#ifndef RETRO_LINK_CORE_ID
+#define RETRO_LINK_CORE_ID 0
 #endif
 
 static int failures;
@@ -91,16 +91,16 @@ int main(void) {
 	load();
 	void* saveRam = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
 	size_t saveSize = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
-	CHECK(retro_gogba_link_checksum() == 0, "checksum before linking is %08X", retro_gogba_link_checksum());
+	CHECK(retro_link_checksum() == 0, "checksum before linking is %08X", retro_link_checksum());
 
 	// A peer with no save, and one with more bytes than any GBA save.
 	static uint8_t huge[0x40000];
 	memset(huge, 0x5A, sizeof(huge));
-	struct retro_gogba_link_player saves[2] = { { huge, sizeof(huge) }, { NULL, 0 } };
-	CHECK(!retro_gogba_link_begin(3, 0, saves, 0), "3 players accepted");
-	CHECK(!retro_gogba_link_begin(2, 2, saves, 0), "local player 2 of 2 accepted");
-	CHECK(retro_gogba_link_begin(2, 0, saves, 1700000000000LL), "link_begin refused a loaded GBA game");
-	CHECK(!retro_gogba_link_begin(2, 0, saves, 0), "a second link_begin was accepted");
+	struct retro_link_player saves[2] = { { huge, sizeof(huge) }, { NULL, 0 } };
+	CHECK(!retro_link_begin(3, 0, saves, 0), "3 players accepted");
+	CHECK(!retro_link_begin(2, 2, saves, 0), "local player 2 of 2 accepted");
+	CHECK(retro_link_begin(2, 0, saves, 1700000000000LL), "link_begin refused a loaded GBA game");
+	CHECK(!retro_link_begin(2, 0, saves, 0), "a second link_begin was accepted");
 	CHECK(retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) == saveRam, "SAVE_RAM moved when linking");
 	CHECK(((uint8_t*) saveRam)[saveSize - 1] == 0x5A, "local save not copied into SAVE_RAM");
 
@@ -110,7 +110,7 @@ int main(void) {
 	optionChanged = true;
 	for (f = 0; f < 60; ++f) {
 		uint16_t masks[2] = { (uint16_t) (1 << 6 | 1 << 7), (uint16_t) (1 << 8) };
-		retro_gogba_link_set_input(masks);
+		retro_link_set_input(masks);
 		retro_run();
 	}
 	optionChanged = false;
@@ -119,8 +119,8 @@ int main(void) {
 	CHECK(sent == 0x03FF, "an option change reached the linked game (P1 sent %04X)", sent);
 	CHECK(framesShown >= 59, "only %d frames shown while linked", framesShown);
 	CHECK(pixelsShown > 0, "the frames shown while linked were never drawn by the local core");
-	CHECK(retro_gogba_link_checksum() != 0, "checksum is 0 while linked");
-	CHECK(retro_gogba_link_core_id() == GOGBA_LINK_CORE_ID, "core id export does not match the build");
+	CHECK(retro_link_checksum() != 0, "checksum is 0 while linked");
+	CHECK(retro_link_core_id() == RETRO_LINK_CORE_ID, "core id export does not match the build");
 	CHECK(retro_serialize_size() == 0, "serialize_size is %zu while linked", retro_serialize_size());
 	static uint8_t state[0x100000];
 	CHECK(!retro_serialize(state, sizeof(state)), "serialize succeeded while linked");
@@ -130,12 +130,12 @@ int main(void) {
 	retro_reset();
 	retro_cheat_set(0, true, "02030004 00000000");
 	uint16_t still[2] = { 0, 0 };
-	retro_gogba_link_set_input(still);
+	retro_link_set_input(still);
 	retro_run();
-	uint32_t afterCalls = retro_gogba_link_checksum();
+	uint32_t afterCalls = retro_link_checksum();
 
-	retro_gogba_link_end();
-	retro_gogba_link_end(); // second end is a no-op
+	retro_link_end();
+	retro_link_end(); // second end is a no-op
 	CHECK(retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) == saveRam, "SAVE_RAM moved when unlinking");
 	framesShown = 0;
 	for (f = 0; f < 30; ++f) {
@@ -145,27 +145,27 @@ int main(void) {
 	CHECK(retro_serialize_size() > 0, "serialize still refused after unlinking");
 
 	// Unloading while linked must free everything once.
-	CHECK(retro_gogba_link_begin(2, 1, saves, 0), "relinking refused");
+	CHECK(retro_link_begin(2, 1, saves, 0), "relinking refused");
 	retro_unload_game();
 	load();
-	CHECK(retro_gogba_link_begin(2, 0, saves, 1700000000000LL), "link_begin refused the second session");
+	CHECK(retro_link_begin(2, 0, saves, 1700000000000LL), "link_begin refused the second session");
 	for (f = 0; f < 60; ++f) {
 		uint16_t masks[2] = { (uint16_t) (1 << 6 | 1 << 7), (uint16_t) (1 << 8) };
-		retro_gogba_link_set_input(masks);
+		retro_link_set_input(masks);
 		retro_run();
 	}
-	retro_gogba_link_set_input(still);
+	retro_link_set_input(still);
 	retro_run();
-	CHECK(retro_gogba_link_checksum() == afterCalls, "reset or cheat reached a linked game (%08X, untouched run %08X)",
-	      afterCalls, retro_gogba_link_checksum());
+	CHECK(retro_link_checksum() == afterCalls, "reset or cheat reached a linked game (%08X, untouched run %08X)",
+	      afterCalls, retro_link_checksum());
 	retro_unload_game();
 
 	// A frontend may pass SAVE_RAM itself as the local save.
 	load();
 	saveRam = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
 	memset(saveRam, 0x42, 16);
-	struct retro_gogba_link_player aliased[2] = { { saveRam, saveSize }, { NULL, 0 } };
-	CHECK(retro_gogba_link_begin(2, 0, aliased, 0), "link_begin refused SAVE_RAM as the local save");
+	struct retro_link_player aliased[2] = { { saveRam, saveSize }, { NULL, 0 } };
+	CHECK(retro_link_begin(2, 0, aliased, 0), "link_begin refused SAVE_RAM as the local save");
 	CHECK(((uint8_t*) saveRam)[0] == 0x42 && ((uint8_t*) saveRam)[15] == 0x42, "passing SAVE_RAM as the local save wiped it");
 	retro_unload_game();
 	retro_deinit();
