@@ -43,6 +43,12 @@ FS_Archive sdmcArchive;
 #endif
 
 #include "libretro_core_options.h"
+#include "libretro_gogba.h"
+#include "link.h"
+
+#ifndef GOGBA_LINK_CORE_ID
+#define GOGBA_LINK_CORE_ID 0
+#endif
 
 #define GBA_RESAMPLED_RATE 65536
 static unsigned targetSampleRate = GBA_RESAMPLED_RATE;
@@ -97,6 +103,9 @@ static void* data;
 static size_t dataSize;
 static void* savedata;
 static size_t savedataSize;
+static char romPath[PATH_MAX];      // for link mode when the frontend passed a path
+static struct GoGBALink* gogbaLink; // not `link`: that would clash with POSIX link() from <unistd.h>
+static void* linkSaves[GOGBA_LINK_MAX_PLAYERS]; // remote players' save buffers
 static struct mAVStream stream;
 static bool sensorsInitDone;
 static bool rumbleInitDone;
@@ -1591,52 +1600,55 @@ void retro_run(void) {
 #endif
 	}
 
-	keys = 0;
-	unsigned i;
-	if (useBitmasks) {
-		int16_t joypadMask = inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
-		for (i = 0; i < sizeof(keymap) / sizeof(*keymap); ++i) {
-			keys |= ((joypadMask >> keymap[i]) & 1) << i;
-		}
-		// XXX: turbo keys, should be moved to frontend
-#define JOYPAD_BIT(BUTTON) (1 << RETRO_DEVICE_ID_JOYPAD_ ## BUTTON)
-		keys |= cycleturbo(joypadMask & JOYPAD_BIT(X), joypadMask & JOYPAD_BIT(Y), joypadMask & JOYPAD_BIT(L2), joypadMask & JOYPAD_BIT(R2));
-#undef JOYPAD_BIT
-	} else {
-		for (i = 0; i < sizeof(keymap) / sizeof(*keymap); ++i) {
-			keys |= (!!inputCallback(0, RETRO_DEVICE_JOYPAD, 0, keymap[i])) << i;
-		}
-		// XXX: turbo keys, should be moved to frontend
-		keys |= cycleturbo(
-			inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X),
-			inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y),
-			inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2),
-			inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2)
-		);
-	}
-
-	core->setKeys(core, keys);
-
-	if (!luxSensorUsed) {
-		static bool wasAdjustingLux = false;
-		if (wasAdjustingLux) {
-			wasAdjustingLux = inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3) ||
-			                  inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3);
+	if (!gogbaLink) {
+		keys = 0;
+		unsigned i;
+		if (useBitmasks) {
+			int16_t joypadMask = inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
+			for (i = 0; i < sizeof(keymap) / sizeof(*keymap); ++i) {
+				keys |= ((joypadMask >> keymap[i]) & 1) << i;
+			}
+			// XXX: turbo keys, should be moved to frontend
+	#define JOYPAD_BIT(BUTTON) (1 << RETRO_DEVICE_ID_JOYPAD_ ## BUTTON)
+			keys |= cycleturbo(joypadMask & JOYPAD_BIT(X), joypadMask & JOYPAD_BIT(Y), joypadMask & JOYPAD_BIT(L2), joypadMask & JOYPAD_BIT(R2));
+	#undef JOYPAD_BIT
 		} else {
-			if (inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3)) {
-				++luxLevelIndex;
-				if (luxLevelIndex > 10) {
-					luxLevelIndex = 10;
+			for (i = 0; i < sizeof(keymap) / sizeof(*keymap); ++i) {
+				keys |= (!!inputCallback(0, RETRO_DEVICE_JOYPAD, 0, keymap[i])) << i;
+			}
+			// XXX: turbo keys, should be moved to frontend
+			keys |= cycleturbo(
+				inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X),
+				inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y),
+				inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2),
+				inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2)
+			);
+		}
+
+		core->setKeys(core, keys);
+
+		if (!luxSensorUsed) {
+			static bool wasAdjustingLux = false;
+			if (wasAdjustingLux) {
+				wasAdjustingLux = inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3) ||
+				                  inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3);
+			} else {
+				if (inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3)) {
+					++luxLevelIndex;
+					if (luxLevelIndex > 10) {
+						luxLevelIndex = 10;
+					}
+					wasAdjustingLux = true;
+				} else if (inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3)) {
+					--luxLevelIndex;
+					if (luxLevelIndex < 0) {
+						luxLevelIndex = 0;
+					}
+					wasAdjustingLux = true;
 				}
-				wasAdjustingLux = true;
-			} else if (inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3)) {
-				--luxLevelIndex;
-				if (luxLevelIndex < 0) {
-					luxLevelIndex = 0;
-				}
-				wasAdjustingLux = true;
 			}
 		}
+
 	}
 
 	/* Check whether current frame should
@@ -1694,7 +1706,13 @@ void retro_run(void) {
       updateAudioLatency = false;
    }
 
-	core->runFrame(core);
+	if (gogbaLink) {
+		if (!GoGBALinkRunFrame(gogbaLink) && logCallback) {
+			logCallback(RETRO_LOG_ERROR, "Link: every machine is blocked on the cable\n");
+		}
+	} else {
+		core->runFrame(core);
+	}
 	unsigned width, height;
 	core->currentVideoSize(core, &width, &height);
 
@@ -1959,6 +1977,9 @@ static void _setupMaps(struct mCore* core) {
 }
 
 void retro_reset(void) {
+	if (gogbaLink) {
+		return;
+	}
 	core->reset(core);
 	mRumbleIntegratorReset(&rumble);
 	_setupMaps(core);
@@ -2021,6 +2042,7 @@ bool retro_load_game(const struct retro_game_info* game) {
 #else
 		data = NULL;
 		rom = VFileOpen(game->path, O_RDONLY);
+		strlcpy(romPath, game->path, sizeof(romPath));
 #endif
 #endif
 	}
@@ -2190,6 +2212,9 @@ void retro_unload_game(void) {
 	if (!core) {
 		return;
 	}
+	if (gogbaLink) {
+		retro_gogba_link_end();
+	}
 	mCoreConfigDeinit(&core->config);
 	core->deinit(core);
 	// deinit frees the core, so clear the pointer with the rest: the guard
@@ -2199,9 +2224,13 @@ void retro_unload_game(void) {
 	data = 0;
 	mappedMemoryFree(savedata, savedataSize);
 	savedata = 0;
+	romPath[0] = '\0';
 }
 
 size_t retro_serialize_size(void) {
+	if (gogbaLink) {
+		return 0;
+	}
 	if (deferredSetup) {
 		_doDeferredSetup();
 	}
@@ -2213,6 +2242,9 @@ size_t retro_serialize_size(void) {
 }
 
 bool retro_serialize(void* data, size_t size) {
+	if (gogbaLink) {
+		return false;
+	}
 	if (deferredSetup) {
 		_doDeferredSetup();
 	}
@@ -2231,6 +2263,9 @@ bool retro_serialize(void* data, size_t size) {
 }
 
 bool retro_unserialize(const void* data, size_t size) {
+	if (gogbaLink) {
+		return false;
+	}
 	if (deferredSetup) {
 		_doDeferredSetup();
 	}
@@ -2274,6 +2309,10 @@ void retro_cheat_reset(void) {
  * prefix. They are additions, never changes to the standard entry points.
  */
 static void _cheatSetWithType(const char* code, int type) {
+	// Both cheat entry points land here; a cheat would desync a link.
+	if (gogbaLink) {
+		return;
+	}
 	// No core means the code was not accepted, which is what the frontend
 	// should report rather than a silent success.
 	if (!core) {
@@ -2746,4 +2785,112 @@ static int32_t _readTiltY(struct mRotationSource* source) {
 static int32_t _readGyroZ(struct mRotationSource* source) {
 	UNUSED(source);
 	return gyroZ;
+}
+
+// Reads the ROM for link mode. `data` already holds it when the frontend
+// passed bytes; for a path it is read once here and then owned the same way,
+// so retro_unload_game frees it either way. It must outlive the local core.
+static bool _linkRomBytes(void) {
+	if (data) {
+		return true;
+	}
+	struct VFile* vf = romPath[0] ? VFileOpen(romPath, O_RDONLY) : NULL;
+	if (!vf) {
+		return false;
+	}
+	ssize_t size = vf->size(vf);
+	data = size > 0 ? anonymousMemoryMap(size) : NULL;
+	bool ok = data && vf->read(vf, data, size) == size;
+	vf->close(vf);
+	if (!ok) {
+		mappedMemoryFree(data, size);
+		data = NULL;
+		return false;
+	}
+	dataSize = size;
+	return true;
+}
+
+static void _setupLocalCore(void) {
+	core->setVideoBuffer(core, outputBuffer, VIDEO_WIDTH_MAX);
+	core->setAVStream(core, &stream);
+	core->setPeripheral(core, mPERIPH_RUMBLE, &rumble);
+#ifdef M_CORE_GB
+	if (core->platform(core) == mPLATFORM_GB) {
+		core->setAudioBufferSize(core, GB_SAMPLES);
+	}
+#endif
+	_setupMaps(core);
+}
+
+RETRO_API bool retro_gogba_link_begin(unsigned players, unsigned localPlayer,
+                                      const struct retro_gogba_link_player* saves, int64_t rtcEpochMs) {
+	if (!core || gogbaLink || !saves || players < 2 || players > GOGBA_LINK_MAX_PLAYERS || localPlayer >= players) {
+		return false;
+	}
+	if (deferredSetup) {
+		_doDeferredSetup();
+	}
+	if (!_linkRomBytes()) {
+		return false;
+	}
+	struct GoGBALinkSave linkSave[GOGBA_LINK_MAX_PLAYERS];
+	unsigned i;
+	for (i = 0; i < players; ++i) {
+		void* buffer = i == localPlayer ? savedata : (linkSaves[i] = anonymousMemoryMap(savedataSize));
+		memset(buffer, 0xFF, savedataSize);
+		if (saves[i].save) {
+			memcpy(buffer, saves[i].save, saves[i].save_size < savedataSize ? saves[i].save_size : savedataSize);
+		}
+		linkSave[i].data = buffer;
+		linkSave[i].size = savedataSize;
+	}
+	struct GoGBALink* created = GoGBALinkCreate(core->platform(core), data, dataSize, players, localPlayer,
+	                                            linkSave, rtcEpochMs);
+	if (!created) {
+		for (i = 0; i < players; ++i) {
+			if (linkSaves[i]) {
+				mappedMemoryFree(linkSaves[i], savedataSize);
+				linkSaves[i] = NULL;
+			}
+		}
+		return false;
+	}
+	// The single-player machine is replaced by the local player's linked one;
+	// `savedata` stays the SAVE_RAM buffer the frontend holds.
+	mCoreConfigDeinit(&core->config);
+	core->deinit(core);
+	gogbaLink = created;
+	core = GoGBALinkLocalCore(gogbaLink);
+	_setupLocalCore();
+	return true;
+}
+
+RETRO_API void retro_gogba_link_set_input(const uint16_t* joypadMasks) {
+	if (gogbaLink && joypadMasks) {
+		GoGBALinkSetInput(gogbaLink, joypadMasks);
+	}
+}
+
+RETRO_API uint32_t retro_gogba_link_checksum(void) {
+	return gogbaLink ? GoGBALinkChecksum(gogbaLink) : 0;
+}
+
+RETRO_API uint64_t retro_gogba_link_core_id(void) {
+	return GOGBA_LINK_CORE_ID;
+}
+
+RETRO_API void retro_gogba_link_end(void) {
+	if (!gogbaLink) {
+		return;
+	}
+	core = GoGBALinkEnd(gogbaLink);
+	gogbaLink = NULL;
+	unsigned i;
+	for (i = 0; i < GOGBA_LINK_MAX_PLAYERS; ++i) {
+		if (linkSaves[i]) {
+			mappedMemoryFree(linkSaves[i], savedataSize);
+			linkSaves[i] = NULL;
+		}
+	}
 }

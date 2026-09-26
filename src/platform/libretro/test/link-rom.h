@@ -14,17 +14,19 @@
 #include <stdint.h>
 #include <string.h>
 
-#define LINK_GBA_ACC 0x02000000     // running mix of every word received
-#define LINK_GBA_COUNT 0x02000004   // loop iterations
-#define LINK_GBA_WORD0 0x02000008   // latest SIOMULTI0 (parent's KEYINPUT)
-#define LINK_GBA_WORD1 0x0200000A   // latest SIOMULTI1 (child's KEYINPUT)
+// The ROM is small enough that the core runs it as a multiboot image, copied
+// to the start of EWRAM, so the results live well past it.
+#define LINK_GBA_ACC 0x02030000     // running mix of every word received
+#define LINK_GBA_COUNT 0x02030004   // loop iterations
+#define LINK_GBA_WORD0 0x02030008   // latest SIOMULTI0 (parent's KEYINPUT)
+#define LINK_GBA_WORD1 0x0203000A   // latest SIOMULTI1 (child's KEYINPUT)
 #define LINK_GBA_ROM_SIZE 0x400
 
 // Multiplayer-mode SIO: each iteration every GBA sends its KEYINPUT, the
 // parent starts a transfer, and both fold what they received into EWRAM.
 static inline void linkBuildGbaRom(uint8_t rom[LINK_GBA_ROM_SIZE]) {
 	enum { BASE = 0xC0 };
-	static const uint32_t pool[] = { 0x04000100, 0x02000000, 0x2003 };
+	static const uint32_t pool[] = { 0x04000100, LINK_GBA_ACC, 0x2003 };
 	uint32_t code[40];
 	int lit[3][2]; // { instruction index, pool index } for each literal load
 	int nlit = 0;
@@ -36,7 +38,7 @@ static inline void linkBuildGbaRom(uint8_t rom[LINK_GBA_ROM_SIZE]) {
 #define LDR_LIT(rd, idx) lit[nlit][0] = n; lit[nlit++][1] = (idx); code[n++] = 0xE59F0000 | (rd) << 12
 #define BRANCH(cond, from, to) ((cond) << 28 | 0x0A000000 | (((to) - ((from) + 2)) & 0xFFFFFF))
 	LDR_LIT(5, 0);                 // r5 = 0x04000100
-	LDR_LIT(6, 1);                 // r6 = 0x02000000
+	LDR_LIT(6, 1);                 // r6 = LINK_GBA_ACC
 	code[n++] = 0xE3A00000;        // mov r0, #0
 	code[n++] = STRH(0, 5, 0x34);  // RCNT = 0: serial mode
 	LDR_LIT(0, 2);                 // r0 = 0x2003
