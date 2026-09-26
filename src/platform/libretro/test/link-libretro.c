@@ -26,6 +26,9 @@ static int checks;
 #define CHECK(cond, ...) do { ++checks; if (!(cond)) { ++failures; printf("FAIL: " __VA_ARGS__); printf("\n"); } } while (0)
 
 static int framesShown;
+// Pixels of the test ROM's backdrop in the last frame (this build is BGR555,
+// no COLOR_5_6_5, the format LINK_GBA_BACKDROP is written in).
+static int pixelsShown;
 
 static bool env(unsigned cmd, void* data) {
 	UNUSED(cmd);
@@ -33,10 +36,16 @@ static bool env(unsigned cmd, void* data) {
 	return false;
 }
 static void video(const void* data, unsigned w, unsigned h, size_t pitch) {
-	UNUSED(w);
-	UNUSED(h);
-	UNUSED(pitch);
 	framesShown += data != NULL;
+	pixelsShown = 0;
+	if (data) {
+		unsigned x, y;
+		for (y = 0; y < h; ++y) {
+			for (x = 0; x < w; ++x) {
+				pixelsShown += ((const uint16_t*) ((const uint8_t*) data + y * pitch))[x] == LINK_GBA_BACKDROP;
+			}
+		}
+	}
 }
 static size_t audio(const int16_t* data, size_t frames) {
 	UNUSED(data);
@@ -90,6 +99,7 @@ int main(void) {
 		retro_run();
 	}
 	CHECK(framesShown >= 59, "only %d frames shown while linked", framesShown);
+	CHECK(pixelsShown > 0, "the frames shown while linked were never drawn by the local core");
 	CHECK(retro_gogba_link_checksum() != 0, "checksum is 0 while linked");
 	CHECK(retro_gogba_link_core_id() == GOGBA_LINK_CORE_ID, "core id export does not match the build");
 	CHECK(retro_serialize_size() == 0, "serialize_size is %zu while linked", retro_serialize_size());

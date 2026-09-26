@@ -15,8 +15,10 @@
 
 #include <mgba/internal/gb/gb.h>
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #define FRAME_TICKS 140448 // GB_VIDEO_TOTAL_LENGTH << 1: DMG and CGB alike
 #define SAVE_SIZE 0x2000
@@ -38,15 +40,18 @@ static struct GoGBALink* makeLink(void) {
 		s[i].data = saves[i];
 		s[i].size = SAVE_SIZE;
 	}
-	struct GoGBALink* link = GoGBALinkCreate(mPLATFORM_GB, rom, LINK_GB_ROM_SIZE, 2, 0, s, 1700000000000LL);
-	if (link) {
-		GoGBALinkLocalCore(link)->setVideoBuffer(GoGBALinkLocalCore(link), localVideo, 256);
-	}
-	return link;
+	return GoGBALinkCreate(mPLATFORM_GB, rom, LINK_GB_ROM_SIZE, 2, 0, s, 1700000000000LL, localVideo, 256);
 }
 
 static int32_t now(struct mCore* core) {
 	return mTimingCurrentTime(&((struct GB*) core->board)->timing);
+}
+
+static void _timeout(int sig) {
+	UNUSED(sig);
+	static const char msg[] = "FAIL: a halted core never returned from its frame\n";
+	write(STDOUT_FILENO, msg, sizeof(msg) - 1);
+	_exit(1);
 }
 
 static void endAndFree(struct GoGBALink* link) {
@@ -121,6 +126,28 @@ int main(void) {
 	ranA = now(a) - startA;
 	CHECK(((struct GB*) a->board)->doubleSpeed, "the ROM did not switch to double speed");
 	CHECK(ranA >= 600 * FRAME_TICKS && ranA < 603 * FRAME_TICKS, "double speed: 600 steps ran %.1f frames", ranA / (double) FRAME_TICKS);
+	endAndFree(link);
+
+	// Both cores halted with nothing to wake them: each step must still end at
+	// its frame instead of letting a halted core skip ahead for ever.
+	linkBuildGbHaltRom(rom);
+	link = makeLink();
+	a = GoGBALinkCore(link, 0);
+	b = GoGBALinkCore(link, 1);
+	startA = now(a);
+	startB = now(b);
+	signal(SIGALRM, _timeout);
+	alarm(20);
+	for (f = 0; f < 60; ++f) {
+		uint16_t masks[2] = { 0, 0 };
+		GoGBALinkSetInput(link, masks);
+		GoGBALinkRunFrame(link);
+	}
+	alarm(0);
+	ranA = now(a) - startA;
+	ranB = now(b) - startB;
+	CHECK(ranA < 61 * FRAME_TICKS && ranB < 61 * FRAME_TICKS, "halted: 60 steps ran %.1f / %.1f frames",
+	      ranA / (double) FRAME_TICKS, ranB / (double) FRAME_TICKS);
 	endAndFree(link);
 
 	printf("%d checks, %d failures\n", checks, failures);

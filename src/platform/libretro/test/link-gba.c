@@ -38,11 +38,8 @@ static struct GoGBALink* makeLink(const uint8_t* image, unsigned local) {
 		s[i].data = saves[i];
 		s[i].size = sizeof(saves[i]);
 	}
-	struct GoGBALink* link = GoGBALinkCreate(mPLATFORM_GBA, image, LINK_GBA_ROM_SIZE, 2, local, s, 1700000000000LL);
-	if (link) {
-		GoGBALinkLocalCore(link)->setVideoBuffer(GoGBALinkLocalCore(link), localVideo, 256);
-	}
-	return link;
+	memset(localVideo, 0, sizeof(localVideo));
+	return GoGBALinkCreate(mPLATFORM_GBA, image, LINK_GBA_ROM_SIZE, 2, local, s, 1700000000000LL, localVideo, 256);
 }
 
 static void endAndFree(struct GoGBALink* link) {
@@ -97,6 +94,12 @@ int main(void) {
 	}
 	CHECK(p2->busRead16(p2, LINK_GBA_WORD0) == 0x03FD, "P1's B did not reach P2 (SIOMULTI0 %04X)", p2->busRead16(p2, LINK_GBA_WORD0));
 	CHECK(p1->busRead32(p1, LINK_GBA_COUNT) > 300, "only %u transfers in 10 frames", p1->busRead32(p1, LINK_GBA_COUNT));
+	int drawn = 0;
+	size_t px;
+	for (px = 0; px < 256 * 160; ++px) {
+		drawn += localVideo[px] == LINK_GBA_BACKDROP;
+	}
+	CHECK(drawn > 0, "the local core drew nothing into its video buffer");
 	CHECK(p1->frameCounter(p1) == 10 && p2->frameCounter(p2) == 10, "10 steps ran %u / %u frames", p1->frameCounter(p1), p2->frameCounter(p2));
 	endAndFree(link);
 

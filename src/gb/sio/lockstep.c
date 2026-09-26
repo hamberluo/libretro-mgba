@@ -9,6 +9,7 @@
 #include <mgba/internal/gb/io.h>
 
 #define LOCKSTEP_INCREMENT 512
+#define GB_SIO_LOCKSTEP_RECHECK 8
 
 static bool GBSIOLockstepNodeInit(struct GBSIODriver* driver);
 static void GBSIOLockstepNodeDeinit(struct GBSIODriver* driver);
@@ -238,7 +239,13 @@ static void _GBSIOLockstepNodeProcessEvents(struct mTiming* timing, void* user, 
 		mTimingSchedule(timing, &node->event, cycles);
 	} else {
 		GBInterrupt(node->d.p->p);
-		mTimingSchedule(timing, &node->event, cyclesLate + 1);
+		// Re-check a few ticks on, not one: a halted CPU only leaves
+		// GBProcessEvents once it reaches its next fetch, which one tick never
+		// gets it to, so with nobody else able to run in between (a
+		// single-threaded frontend) this event would be serviced for ever.
+		// The ticks until then are charged at the next update like any others.
+		node->eventDiff += GB_SIO_LOCKSTEP_RECHECK;
+		mTimingSchedule(timing, &node->event, cyclesLate + GB_SIO_LOCKSTEP_RECHECK);
 	}
 }
 

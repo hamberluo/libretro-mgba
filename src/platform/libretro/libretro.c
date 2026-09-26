@@ -2812,7 +2812,6 @@ static bool _linkRomBytes(void) {
 }
 
 static void _setupLocalCore(void) {
-	core->setVideoBuffer(core, outputBuffer, VIDEO_WIDTH_MAX);
 	core->setAVStream(core, &stream);
 	core->setPeripheral(core, mPERIPH_RUMBLE, &rumble);
 #ifdef M_CORE_GB
@@ -2846,7 +2845,7 @@ RETRO_API bool retro_gogba_link_begin(unsigned players, unsigned localPlayer,
 		linkSave[i].size = savedataSize;
 	}
 	struct GoGBALink* created = GoGBALinkCreate(core->platform(core), data, dataSize, players, localPlayer,
-	                                            linkSave, rtcEpochMs);
+	                                            linkSave, rtcEpochMs, outputBuffer, VIDEO_WIDTH_MAX);
 	if (!created) {
 		for (i = 0; i < players; ++i) {
 			if (linkSaves[i]) {

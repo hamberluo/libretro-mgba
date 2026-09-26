@@ -27,17 +27,19 @@ struct GoGBALinkSave {
 struct GoGBALink;
 
 // Builds `players` cores of `platform` from the same ROM, loads each player's
-// save and cold-boots them joined by a cable. `rom` and every saves[i].data
-// must outlive every core the link creates, including the local one after
-// GoGBALinkEnd: the cores map them in place. Returns NULL on bad arguments or
-// a ROM the platform rejects.
+// save and cold-boots them joined by a cable. `rom`, every saves[i].data and
+// `localVideo` must outlive every core the link creates, including the local
+// one after GoGBALinkEnd: the cores use them in place. The local core draws
+// into `localVideo` (`localStride` pixels per row); it has to be given here,
+// because a core binds its renderer at reset only if it already has a buffer.
+// Returns NULL on bad arguments or a ROM the platform rejects.
 struct GoGBALink* GoGBALinkCreate(enum mPlatform platform, const void* rom, size_t romSize,
                                   unsigned players, unsigned localPlayer,
-                                  const struct GoGBALinkSave* saves, int64_t rtcEpochMs);
+                                  const struct GoGBALinkSave* saves, int64_t rtcEpochMs,
+                                  mColor* localVideo, size_t localStride);
 
 struct mCore* GoGBALinkCore(struct GoGBALink*, unsigned player);
-// The local core draws and plays sound. It has no video buffer until the
-// caller gives it one with setVideoBuffer -- do that before the first frame.
+// The core that draws into `localVideo` and plays sound.
 struct mCore* GoGBALinkLocalCore(struct GoGBALink*);
 
 // One libretro joypad mask (RETRO_DEVICE_ID_JOYPAD_* bits) per player, for the

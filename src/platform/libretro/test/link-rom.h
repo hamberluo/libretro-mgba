@@ -21,14 +21,17 @@
 #define LINK_GBA_WORD0 0x02030008   // latest SIOMULTI0 (parent's KEYINPUT)
 #define LINK_GBA_WORD1 0x0203000A   // latest SIOMULTI1 (child's KEYINPUT)
 #define LINK_GBA_ROM_SIZE 0x400
+// Backdrop colour the ROM paints, BGR555. Not white: a renderer reset clears
+// its buffer to white, so a white frame does not prove the core drew it.
+#define LINK_GBA_BACKDROP 0x03E0
 
 // Multiplayer-mode SIO: each iteration every GBA sends its KEYINPUT, the
 // parent starts a transfer, and both fold what they received into EWRAM.
 static inline void linkBuildGbaRom(uint8_t rom[LINK_GBA_ROM_SIZE]) {
 	enum { BASE = 0xC0 };
-	static const uint32_t pool[] = { 0x04000100, LINK_GBA_ACC, 0x2003 };
-	uint32_t code[40];
-	int lit[3][2]; // { instruction index, pool index } for each literal load
+	static const uint32_t pool[] = { 0x04000100, LINK_GBA_ACC, 0x2003, 0x05000000, LINK_GBA_BACKDROP, 0x04000000 };
+	uint32_t code[48];
+	int lit[6][2]; // { instruction index, pool index } for each literal load
 	int nlit = 0;
 	int n = 0;
 	int loop, wait, bne;
@@ -37,6 +40,12 @@ static inline void linkBuildGbaRom(uint8_t rom[LINK_GBA_ROM_SIZE]) {
 #define STRH(rd, rn, off) (0xE1C000B0 | (rn) << 16 | (rd) << 12 | ((off) & 0xF0) << 4 | ((off) & 0xF))
 #define LDR_LIT(rd, idx) lit[nlit][0] = n; lit[nlit++][1] = (idx); code[n++] = 0xE59F0000 | (rd) << 12
 #define BRANCH(cond, from, to) ((cond) << 28 | 0x0A000000 | (((to) - ((from) + 2)) & 0xFFFFFF))
+	LDR_LIT(0, 3);                 // r0 = palette RAM
+	LDR_LIT(1, 4);                 // r1 = LINK_GBA_BACKDROP
+	code[n++] = STRH(1, 0, 0);     // backdrop colour, so a drawn frame is recognisable
+	LDR_LIT(0, 5);                 // r0 = 0x04000000
+	code[n++] = 0xE3A01000;        // mov r1, #0
+	code[n++] = STRH(1, 0, 0);     // DISPCNT = 0: mode 0, no layers, just the backdrop
 	LDR_LIT(5, 0);                 // r5 = 0x04000100
 	LDR_LIT(6, 1);                 // r6 = LINK_GBA_ACC
 	code[n++] = 0xE3A00000;        // mov r0, #0
@@ -146,6 +155,23 @@ static inline void linkBuildGbRom(uint8_t rom[LINK_GB_ROM_SIZE], bool doubleSpee
 		check = check - rom[i] - 1;
 	}
 	rom[0x14D] = check;
+}
+
+// A GB that turns the LCD off, enables only the serial interrupt and halts,
+// as Pokémon Crystal does while it waits on the cable at boot. Nothing ever
+// wakes it: no transfer starts. A halted core keeps skipping to its next event
+// inside one runLoop call, so only a frame deadline brings it back.
+static inline void linkBuildGbHaltRom(uint8_t rom[LINK_GB_ROM_SIZE]) {
+	static const uint8_t code[] = {
+		0x3E, 0x00, 0xE0, 0x40, // ld a,0 ; ldh (40),a   LCD off
+		0x3E, 0x08, 0xE0, 0xFF, // ld a,8 ; ldh (FF),a   IE = serial only
+		0xFB,                   // ei
+		0x76,                   // loop: halt
+		0x18, 0xFD,             // jr loop
+	};
+	linkBuildGbRom(rom, false);
+	memset(&rom[0x150], 0, 0x100);
+	memcpy(&rom[0x150], code, sizeof(code));
 }
 
 #endif

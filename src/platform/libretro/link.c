@@ -53,6 +53,7 @@ struct GoGBALink {
 	unsigned players;
 	unsigned localPlayer;
 	struct GoGBALinkPlayer player[GOGBA_LINK_MAX_PLAYERS];
+	struct GoGBALinkPlayer* running; // inside runLoop right now, if anyone
 	struct mRotationSource rotation;
 #ifdef M_CORE_GBA
 	struct GBALuminanceSource lux;
@@ -101,12 +102,47 @@ static struct mTiming* _timing(struct GoGBALinkPlayer* player) {
 	}
 }
 
+// Makes the core's current runLoop return as soon as it can. A halted core
+// otherwise keeps skipping from event to event inside one runLoop until an
+// interrupt wakes it -- on the cable, one only the other core can send.
+static void _breakRunLoop(struct GoGBALinkPlayer* player) {
+	switch (player->link->platform) {
+#ifdef M_CORE_GBA
+	case mPLATFORM_GBA:
+		((struct GBA*) player->core->board)->earlyExit = true;
+		break;
+#endif
+#ifdef M_CORE_GB
+	case mPLATFORM_GB:
+		((struct GB*) player->core->board)->earlyExit = true;
+		break;
+#endif
+	default:
+		break;
+	}
+}
+
+// Parking and waking stand in for threads blocking and resuming: waking a
+// core makes whoever is running yield, as another thread would simply start
+// running. Without it, a halted core that just released another one keeps
+// skipping ahead alone.
+static void _park(struct GoGBALinkPlayer* player) {
+	player->asleep = true;
+}
+
+static void _wake(struct GoGBALinkPlayer* player) {
+	player->asleep = false;
+	if (player->link->running && player->link->running != player) {
+		_breakRunLoop(player->link->running);
+	}
+}
+
 static void _playerSleep(struct mLockstepUser* user) {
-	((struct GoGBALinkPlayer*) user)->asleep = true;
+	_park((struct GoGBALinkPlayer*) user);
 }
 
 static void _playerWake(struct mLockstepUser* user) {
-	((struct GoGBALinkPlayer*) user)->asleep = false;
+	_wake((struct GoGBALinkPlayer*) user);
 }
 
 static int _playerRequestedId(struct mLockstepUser* user) {
@@ -127,8 +163,8 @@ static struct GoGBALinkPlayer* _gbPlayerById(struct GoGBALink* link, int id) {
 
 static void _gbPark(struct GoGBALinkPlayer* player) {
 	struct SM83Core* cpu = player->core->cpu;
-	player->asleep = true;
 	cpu->nextEvent = cpu->cycles; // leave runLoop so the scheduler can switch cores
+	_park(player);
 }
 
 static bool _gbSignal(struct mLockstep* lockstep, unsigned mask) {
@@ -141,13 +177,13 @@ static bool _gbSignal(struct mLockstep* lockstep, unsigned mask) {
 		if (link->gbWaitMask & (1u << id)) {
 			link->gbWaitMask &= ~(1u << id);
 			if (!link->gbWaitMask) {
-				_gbPlayerById(link, 0)->asleep = false;
+				_wake(_gbPlayerById(link, 0));
 			}
 		}
 		// The master signalling lets slaves run; a slave signalling that it
 		// caught up does not wake itself.
 		if (id != 0 && mask != (1u << id)) {
-			_gbPlayerById(link, id)->asleep = false;
+			_wake(_gbPlayerById(link, id));
 		}
 	}
 	return true;
@@ -159,7 +195,7 @@ static bool _gbWait(struct mLockstep* lockstep, unsigned mask) {
 	link->gbWaitMask |= mask;
 	for (id = 1; id < (int) link->players; ++id) {
 		if (mask & (1u << id)) {
-			_gbPlayerById(link, id)->asleep = false;
+			_wake(_gbPlayerById(link, id));
 		}
 	}
 	if (link->gbWaitMask) {
@@ -180,7 +216,7 @@ static void _gbAddCycles(struct mLockstep* lockstep, int id, int32_t cycles) {
 	for (i = 1; i < (int) link->players; ++i) {
 		link->gbPosted[i] += cycles;
 		if (link->gbPosted[i] > 0) {
-			_gbPlayerById(link, i)->asleep = false;
+			_wake(_gbPlayerById(link, i));
 		}
 	}
 }
@@ -279,8 +315,9 @@ static bool _plugIn(struct GoGBALinkPlayer* player) {
 
 struct GoGBALink* GoGBALinkCreate(enum mPlatform platform, const void* rom, size_t romSize,
                                   unsigned players, unsigned localPlayer,
-                                  const struct GoGBALinkSave* saves, int64_t rtcEpochMs) {
-	if (players < 2 || players > GOGBA_LINK_MAX_PLAYERS || localPlayer >= players || !rom || !saves) {
+                                  const struct GoGBALinkSave* saves, int64_t rtcEpochMs,
+                                  mColor* localVideo, size_t localStride) {
+	if (players < 2 || players > GOGBA_LINK_MAX_PLAYERS || localPlayer >= players || !rom || !saves || !localVideo) {
 		return NULL;
 	}
 	struct GoGBALink* link = calloc(1, sizeof(*link));
@@ -324,7 +361,11 @@ struct GoGBALink* GoGBALinkCreate(enum mPlatform platform, const void* rom, size
 		player->core->rtc.override = RTC_FAKE_EPOCH;
 		player->core->rtc.value = rtcEpochMs;
 		player->core->setPeripheral(player->core, mPERIPH_ROTATION, &link->rotation);
-		if (i != localPlayer) {
+		// Before reset: that is when a core picks its renderer, and without a
+		// buffer it picks one that never draws.
+		if (i == localPlayer) {
+			player->core->setVideoBuffer(player->core, localVideo, localStride);
+		} else {
 			player->scratchVideo = calloc(256 * 224, sizeof(mColor));
 			player->core->setVideoBuffer(player->core, player->scratchVideo, 256);
 		}
@@ -433,7 +474,9 @@ bool GoGBALinkRunFrame(struct GoGBALink* link) {
 				if (pass == 0 && mTimingCurrentTime(_timing(player)) - target[i] >= 0) {
 					continue;
 				}
+				link->running = player;
 				player->core->runLoop(player->core);
+				link->running = NULL;
 				ran = true;
 			}
 		}
