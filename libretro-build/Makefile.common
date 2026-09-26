@@ -1,6 +1,12 @@
 #plain 'make' doesn't include the file that sets this. force it set anyways.
 RETRODEFS ?= -D__LIBRETRO__
 RETRODEFS += -DMINIMAL_CORE=2 -DM_CORE_GBA -DM_CORE_GB -DENABLE_VFS -DENABLE_DIRECTORIES
+# The core compares int32 timestamps as `a - b >= 0` and relies on the wrap;
+# upstream's CMake build passes -fwrapv for this. Without it the optimizer folds
+# that to `a >= b`, and linked GBAs (lockstep SIO) hang once the clock passes
+# 2^31 cycles (~128 s). It rides on RETRODEFS so every platform Makefile and
+# jni/Android.mk pick it up.
+RETRODEFS += -fwrapv
 
 # macOS has strlcpy in its SDK - avoid redeclaration
 ifeq ($(shell uname -s),Darwin)
