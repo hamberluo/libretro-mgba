@@ -169,3 +169,7 @@ endif
 else
 SOURCES_C += $(CORE_DIR)/src/util/vfs/vfs-file.c
 endif
+
+# Link compatibility fingerprint, see link_core_id.sh.
+LINK_CORE_ID := $(shell sh $(CORE_DIR)/libretro-build/link_core_id.sh $(CORE_DIR))
+RETRODEFS += -DGOGBA_LINK_CORE_ID=0x$(LINK_CORE_ID)ULL
