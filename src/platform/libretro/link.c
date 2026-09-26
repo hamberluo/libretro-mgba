@@ -362,3 +362,34 @@ uint32_t GoGBALinkChecksum(struct GoGBALink* link) {
 	}
 	return crc;
 }
+static void _unplug(struct GoGBALinkPlayer* player) {
+	switch (player->link->platform) {
+#ifdef M_CORE_GBA
+	case mPLATFORM_GBA:
+		// Setting no driver deinits the lockstep one, which removes the player
+		// from the coordinator and wakes whoever was waiting on it.
+		player->core->setPeripheral(player->core, mPERIPH_GBA_LINK_PORT, NULL);
+		break;
+#endif
+	default:
+		break;
+	}
+	player->asleep = false;
+}
+
+struct mCore* GoGBALinkEnd(struct GoGBALink* link) {
+	unsigned i;
+	for (i = 0; i < link->players; ++i) {
+		_unplug(&link->player[i]);
+	}
+	struct mCore* local = link->player[link->localPlayer].core;
+	link->player[link->localPlayer].core = NULL;
+	for (i = 0; i < link->players; ++i) {
+		_destroyPlayer(&link->player[i]);
+	}
+#ifdef M_CORE_GBA
+	GBASIOLockstepCoordinatorDeinit(&link->gbaCoordinator);
+#endif
+	free(link);
+	return local;
+}

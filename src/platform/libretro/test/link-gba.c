@@ -45,6 +45,12 @@ static struct GoGBALink* makeLink(const uint8_t* image, unsigned local) {
 	return link;
 }
 
+static void endAndFree(struct GoGBALink* link) {
+	struct mCore* local = GoGBALinkEnd(link);
+	mCoreConfigDeinit(&local->config);
+	local->deinit(local);
+}
+
 static uint16_t input(unsigned frame, unsigned player) {
 	// A fixed, non-trivial pattern: each player presses something different.
 	return (uint16_t) (((frame * 2654435761u) >> (player ? 7 : 13)) & 0x0FFF);
@@ -61,8 +67,7 @@ static void checksums(uint32_t out[10]) {
 			out[frame / 60] = GoGBALinkChecksum(link);
 		}
 	}
-	mCoreConfigDeinit(&GoGBALinkLocalCore(link)->config);
-	GoGBALinkLocalCore(link)->deinit(GoGBALinkLocalCore(link)); // replaced by GoGBALinkEnd in Task 3
+	endAndFree(link);
 }
 
 int main(void) {
@@ -93,8 +98,7 @@ int main(void) {
 	CHECK(p2->busRead16(p2, LINK_GBA_WORD0) == 0x03FD, "P1's B did not reach P2 (SIOMULTI0 %04X)", p2->busRead16(p2, LINK_GBA_WORD0));
 	CHECK(p1->busRead32(p1, LINK_GBA_COUNT) > 300, "only %u transfers in 10 frames", p1->busRead32(p1, LINK_GBA_COUNT));
 	CHECK(p1->frameCounter(p1) == 10 && p2->frameCounter(p2) == 10, "10 steps ran %u / %u frames", p1->frameCounter(p1), p2->frameCounter(p2));
-	mCoreConfigDeinit(&p2->config);
-	p2->deinit(p2); // replaced by GoGBALinkEnd in Task 3
+	endAndFree(link);
 
 	// Determinism, and the checksum sees input.
 	uint32_t first[10], second[10];
@@ -118,8 +122,26 @@ int main(void) {
 	int32_t ran = mTimingCurrentTime(&((struct GBA*) a->board)->timing) - start;
 	CHECK(ran >= 300 * FRAME_TICKS && ran < 302 * FRAME_TICKS, "idle game: 300 steps ran %d ticks", ran);
 	CHECK(b->frameCounter(b) == 300, "idle game: remote ran %u frames", b->frameCounter(b));
-	mCoreConfigDeinit(&a->config);
-	a->deinit(a); // replaced by GoGBALinkEnd in Task 3
+	endAndFree(link);
+
+	// Unplug mid-transfer: the local core must keep running on its own, not
+	// stay parked by a coordinator that is gone.
+	link = makeLink(rom, 1);
+	for (f = 0; f < 3; ++f) {
+		masks[0] = masks[1] = 0;
+		GoGBALinkSetInput(link, masks);
+		GoGBALinkRunFrame(link);
+	}
+	struct mCore* alone = GoGBALinkEnd(link);
+	uint32_t before = alone->frameCounter(alone);
+	for (f = 0; f < 60; ++f) {
+		alone->runFrame(alone);
+	}
+	CHECK(alone->frameCounter(alone) == before + 60, "after unplugging, 60 runFrame calls ran %u frames",
+	      alone->frameCounter(alone) - before);
+	CHECK(!((struct GBA*) alone->board)->sio.driver, "local core still has the lockstep driver");
+	mCoreConfigDeinit(&alone->config);
+	alone->deinit(alone);
 
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures != 0;
