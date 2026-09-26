@@ -160,48 +160,84 @@ static void _RegisterRamReset(struct GBA* gba) {
 	}
 }
 
+// The BIOS's own sine table, trunc(16384 * sin(2 * pi * i / 256)),
+// read back from a real BIOS through ObjAffineSet. Integer throughout: these
+// results land in game memory, and sinf/cosf differ in the last bit between
+// platforms' libm, which desyncs linked play across iOS and Android.
+static const int16_t _sineTable[256] = {
+	0x0000, 0x0192, 0x0323, 0x04B5, 0x0645, 0x07D5, 0x0964, 0x0AF1,
+	0x0C7C, 0x0E05, 0x0F8C, 0x1111, 0x1294, 0x1413, 0x158F, 0x1708,
+	0x187D, 0x19EF, 0x1B5D, 0x1CC6, 0x1E2B, 0x1F8B, 0x20E7, 0x223D,
+	0x238E, 0x24DA, 0x261F, 0x275F, 0x2899, 0x29CD, 0x2AFA, 0x2C21,
+	0x2D41, 0x2E5A, 0x2F6B, 0x3076, 0x3179, 0x3274, 0x3367, 0x3453,
+	0x3536, 0x3612, 0x36E5, 0x37AF, 0x3871, 0x392A, 0x39DA, 0x3A82,
+	0x3B20, 0x3BB6, 0x3C42, 0x3CC5, 0x3D3E, 0x3DAE, 0x3E14, 0x3E71,
+	0x3EC5, 0x3F0E, 0x3F4E, 0x3F84, 0x3FB1, 0x3FD3, 0x3FEC, 0x3FFB,
+	0x4000, 0x3FFB, 0x3FEC, 0x3FD3, 0x3FB1, 0x3F84, 0x3F4E, 0x3F0E,
+	0x3EC5, 0x3E71, 0x3E14, 0x3DAE, 0x3D3E, 0x3CC5, 0x3C42, 0x3BB6,
+	0x3B20, 0x3A82, 0x39DA, 0x392A, 0x3871, 0x37AF, 0x36E5, 0x3612,
+	0x3536, 0x3453, 0x3367, 0x3274, 0x3179, 0x3076, 0x2F6B, 0x2E5A,
+	0x2D41, 0x2C21, 0x2AFA, 0x29CD, 0x2899, 0x275F, 0x261F, 0x24DA,
+	0x238E, 0x223D, 0x20E7, 0x1F8B, 0x1E2B, 0x1CC6, 0x1B5D, 0x19EF,
+	0x187D, 0x1708, 0x158F, 0x1413, 0x1294, 0x1111, 0x0F8C, 0x0E05,
+	0x0C7C, 0x0AF1, 0x0964, 0x07D5, 0x0645, 0x04B5, 0x0323, 0x0192,
+	0x0000, -0x0192, -0x0323, -0x04B5, -0x0645, -0x07D5, -0x0964, -0x0AF1,
+	-0x0C7C, -0x0E05, -0x0F8C, -0x1111, -0x1294, -0x1413, -0x158F, -0x1708,
+	-0x187D, -0x19EF, -0x1B5D, -0x1CC6, -0x1E2B, -0x1F8B, -0x20E7, -0x223D,
+	-0x238E, -0x24DA, -0x261F, -0x275F, -0x2899, -0x29CD, -0x2AFA, -0x2C21,
+	-0x2D41, -0x2E5A, -0x2F6B, -0x3076, -0x3179, -0x3274, -0x3367, -0x3453,
+	-0x3536, -0x3612, -0x36E5, -0x37AF, -0x3871, -0x392A, -0x39DA, -0x3A82,
+	-0x3B20, -0x3BB6, -0x3C42, -0x3CC5, -0x3D3E, -0x3DAE, -0x3E14, -0x3E71,
+	-0x3EC5, -0x3F0E, -0x3F4E, -0x3F84, -0x3FB1, -0x3FD3, -0x3FEC, -0x3FFB,
+	-0x4000, -0x3FFB, -0x3FEC, -0x3FD3, -0x3FB1, -0x3F84, -0x3F4E, -0x3F0E,
+	-0x3EC5, -0x3E71, -0x3E14, -0x3DAE, -0x3D3E, -0x3CC5, -0x3C42, -0x3BB6,
+	-0x3B20, -0x3A82, -0x39DA, -0x392A, -0x3871, -0x37AF, -0x36E5, -0x3612,
+	-0x3536, -0x3453, -0x3367, -0x3274, -0x3179, -0x3076, -0x2F6B, -0x2E5A,
+	-0x2D41, -0x2C21, -0x2AFA, -0x29CD, -0x2899, -0x275F, -0x261F, -0x24DA,
+	-0x238E, -0x223D, -0x20E7, -0x1F8B, -0x1E2B, -0x1CC6, -0x1B5D, -0x19EF,
+	-0x187D, -0x1708, -0x158F, -0x1413, -0x1294, -0x1111, -0x0F8C, -0x0E05,
+	-0x0C7C, -0x0AF1, -0x0964, -0x07D5, -0x0645, -0x04B5, -0x0323, -0x0192,
+};
+
+static void _affineMatrix(int32_t sx, int32_t sy, uint16_t theta, int32_t* a, int32_t* b, int32_t* c, int32_t* d) {
+	int32_t sine = _sineTable[theta >> 8];
+	int32_t cosine = _sineTable[((theta >> 8) + 64) & 0xFF];
+	// [ sx 0 ] [ cos -sin ]
+	// [ 0 sy ] [ sin  cos ], in 8.8 fixed point; the BIOS negates B after the shift.
+	*a = (sx * cosine) >> 14;
+	*b = -((sx * sine) >> 14);
+	*c = (sy * sine) >> 14;
+	*d = (sy * cosine) >> 14;
+}
+
 static void _BgAffineSet(struct GBA* gba) {
 	struct ARMCore* cpu = gba->cpu;
 	int i = cpu->gprs[2];
-	float ox, oy;
-	float cx, cy;
-	float sx, sy;
-	float theta;
 	int offset = cpu->gprs[0];
 	int destination = cpu->gprs[1];
-	float a, b, c, d;
-	float rx, ry;
 	enum mMemoryAccessSource oldAccess = cpu->memory.accessSource;
 	cpu->memory.accessSource = mACCESS_SYSTEM;
 	while (i--) {
-		// [ sx   0  0 ]   [ cos(theta)  -sin(theta)  0 ]   [ 1  0  cx - ox ]   [ A B rx ]
-		// [  0  sy  0 ] * [ sin(theta)   cos(theta)  0 ] * [ 0  1  cy - oy ] = [ C D ry ]
-		// [  0   0  1 ]   [     0            0       1 ]   [ 0  0     1    ]   [ 0 0  1 ]
-		ox = (int32_t) cpu->memory.load32(cpu, offset, 0) / 256.f;
-		oy = (int32_t) cpu->memory.load32(cpu, offset + 4, 0) / 256.f;
-		cx = (int16_t) cpu->memory.load16(cpu, offset + 8, 0);
-		cy = (int16_t) cpu->memory.load16(cpu, offset + 10, 0);
-		sx = (int16_t) cpu->memory.load16(cpu, offset + 12, 0) / 256.f;
-		sy = (int16_t) cpu->memory.load16(cpu, offset + 14, 0) / 256.f;
-		theta = (cpu->memory.load16(cpu, offset + 16, 0) >> 8) / 128.f * M_PI;
+		int32_t ox = cpu->memory.load32(cpu, offset, 0);
+		int32_t oy = cpu->memory.load32(cpu, offset + 4, 0);
+		int32_t cx = (int16_t) cpu->memory.load16(cpu, offset + 8, 0);
+		int32_t cy = (int16_t) cpu->memory.load16(cpu, offset + 10, 0);
+		int32_t sx = (int16_t) cpu->memory.load16(cpu, offset + 12, 0);
+		int32_t sy = (int16_t) cpu->memory.load16(cpu, offset + 14, 0);
+		uint16_t theta = cpu->memory.load16(cpu, offset + 16, 0);
+		int32_t a, b, c, d;
 		offset += 20;
-		// Rotation
-		a = d = cosf(theta);
-		b = c = sinf(theta);
-		// Scale
-		a *= sx;
-		b *= -sx;
-		c *= sy;
-		d *= sy;
-		// Translate
-		rx = ox - (a * cx + b * cy);
-		ry = oy - (c * cx + d * cy);
-		cpu->memory.store16(cpu, destination, a * 256, 0);
-		cpu->memory.store16(cpu, destination + 2, b * 256, 0);
-		cpu->memory.store16(cpu, destination + 4, c * 256, 0);
-		cpu->memory.store16(cpu, destination + 6, d * 256, 0);
-		cpu->memory.store32(cpu, destination + 8, rx * 256, 0);
-		cpu->memory.store32(cpu, destination + 12, ry * 256, 0);
+		_affineMatrix(sx, sy, theta, &a, &b, &c, &d);
+		// The translation uses the full-width matrix, not its 16-bit stores:
+		// the two only differ at the scale extremes, and there the BIOS uses these.
+		int32_t rx = ox - (a * cx + b * cy);
+		int32_t ry = oy - (c * cx + d * cy);
+		cpu->memory.store16(cpu, destination, a, 0);
+		cpu->memory.store16(cpu, destination + 2, b, 0);
+		cpu->memory.store16(cpu, destination + 4, c, 0);
+		cpu->memory.store16(cpu, destination + 6, d, 0);
+		cpu->memory.store32(cpu, destination + 8, rx, 0);
+		cpu->memory.store32(cpu, destination + 12, ry, 0);
 		destination += 16;
 	}
 	cpu->memory.accessSource = oldAccess;
@@ -210,33 +246,22 @@ static void _BgAffineSet(struct GBA* gba) {
 static void _ObjAffineSet(struct GBA* gba) {
 	struct ARMCore* cpu = gba->cpu;
 	int i = cpu->gprs[2];
-	float sx, sy;
-	float theta;
 	int offset = cpu->gprs[0];
 	int destination = cpu->gprs[1];
 	int diff = cpu->gprs[3];
-	float a, b, c, d;
 	enum mMemoryAccessSource oldAccess = cpu->memory.accessSource;
 	cpu->memory.accessSource = mACCESS_SYSTEM;
 	while (i--) {
-		// [ sx   0 ]   [ cos(theta)  -sin(theta) ]   [ A B ]
-		// [  0  sy ] * [ sin(theta)   cos(theta) ] = [ C D ]
-		sx = (int16_t) cpu->memory.load16(cpu, offset, 0) / 256.f;
-		sy = (int16_t) cpu->memory.load16(cpu, offset + 2, 0) / 256.f;
-		theta = (cpu->memory.load16(cpu, offset + 4, 0) >> 8) / 128.f * M_PI;
+		int32_t sx = (int16_t) cpu->memory.load16(cpu, offset, 0);
+		int32_t sy = (int16_t) cpu->memory.load16(cpu, offset + 2, 0);
+		uint16_t theta = cpu->memory.load16(cpu, offset + 4, 0);
+		int32_t a, b, c, d;
 		offset += 8;
-		// Rotation
-		a = d = cosf(theta);
-		b = c = sinf(theta);
-		// Scale
-		a *= sx;
-		b *= -sx;
-		c *= sy;
-		d *= sy;
-		cpu->memory.store16(cpu, destination, a * 256, 0);
-		cpu->memory.store16(cpu, destination + diff, b * 256, 0);
-		cpu->memory.store16(cpu, destination + diff * 2, c * 256, 0);
-		cpu->memory.store16(cpu, destination + diff * 3, d * 256, 0);
+		_affineMatrix(sx, sy, theta, &a, &b, &c, &d);
+		cpu->memory.store16(cpu, destination, a, 0);
+		cpu->memory.store16(cpu, destination + diff, b, 0);
+		cpu->memory.store16(cpu, destination + diff * 2, c, 0);
+		cpu->memory.store16(cpu, destination + diff * 3, d, 0);
 		destination += diff * 4;
 	}
 	cpu->memory.accessSource = oldAccess;

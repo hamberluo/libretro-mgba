@@ -65,6 +65,7 @@ TESTS=(
 	"core-deinit:src/gb/test/core-deinit.c:src/gb/test/core-deinit-stubs.c src/core/*.c src/gb/*.c src/gb/mbc/*.c src/gb/renderers/*.c src/sm83/*.c src/util/*.c src/util/vfs/vfs-file.c src/util/vfs/vfs-mem.c"
 	"gba-core-deinit:src/gba/test/core-deinit.c:src/gba/test/core-deinit-stubs.c src/core/*.c src/gba/*.c src/gba/renderers/*.c src/gba/cheats/*.c src/gba/cart/*.c src/gba/sio/*.c src/arm/*.c src/gb/*.c src/gb/mbc/*.c src/gb/renderers/*.c src/sm83/*.c src/util/*.c src/util/vfs/vfs-file.c src/util/vfs/vfs-mem.c"
 	"lockstep-wrap:src/gba/test/lockstep-wrap.c:src/gba/test/core-deinit-stubs.c src/core/*.c src/gba/*.c src/gba/renderers/*.c src/gba/cheats/*.c src/gba/cart/*.c src/gba/sio/*.c src/arm/*.c src/gb/*.c src/gb/mbc/*.c src/gb/renderers/*.c src/sm83/*.c src/util/*.c src/util/vfs/vfs-file.c src/util/vfs/vfs-mem.c"
+	"bios-affine:src/gba/test/bios-affine.c:src/gba/test/core-deinit-stubs.c src/core/*.c src/gba/*.c src/gba/renderers/*.c src/gba/cheats/*.c src/gba/cart/*.c src/gba/sio/*.c src/arm/*.c src/gb/*.c src/gb/mbc/*.c src/gb/renderers/*.c src/sm83/*.c src/util/*.c src/util/vfs/vfs-file.c src/util/vfs/vfs-mem.c"
 )
 
 mkdir -p "$BUILD_DIR"
