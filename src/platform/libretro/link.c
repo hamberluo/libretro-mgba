@@ -113,6 +113,97 @@ static int _playerRequestedId(struct mLockstepUser* user) {
 	return ((struct GoGBALinkPlayer*) user)->index;
 }
 
+#ifdef M_CORE_GB
+static struct GoGBALinkPlayer* _gbPlayerById(struct GoGBALink* link, int id) {
+	// The node that starts a transfer takes id 0, so ids and players can swap.
+	unsigned i;
+	for (i = 0; i < link->players; ++i) {
+		if (link->player[i].gbNode.id == id) {
+			return &link->player[i];
+		}
+	}
+	return NULL;
+}
+
+static void _gbPark(struct GoGBALinkPlayer* player) {
+	struct SM83Core* cpu = player->core->cpu;
+	player->asleep = true;
+	cpu->nextEvent = cpu->cycles; // leave runLoop so the scheduler can switch cores
+}
+
+static bool _gbSignal(struct mLockstep* lockstep, unsigned mask) {
+	struct GoGBALink* link = lockstep->context;
+	int id;
+	for (id = 0; id < (int) link->players; ++id) {
+		if (!(mask & (1u << id))) {
+			continue;
+		}
+		if (link->gbWaitMask & (1u << id)) {
+			link->gbWaitMask &= ~(1u << id);
+			if (!link->gbWaitMask) {
+				_gbPlayerById(link, 0)->asleep = false;
+			}
+		}
+		// The master signalling lets slaves run; a slave signalling that it
+		// caught up does not wake itself.
+		if (id != 0 && mask != (1u << id)) {
+			_gbPlayerById(link, id)->asleep = false;
+		}
+	}
+	return true;
+}
+
+static bool _gbWait(struct mLockstep* lockstep, unsigned mask) {
+	struct GoGBALink* link = lockstep->context;
+	int id;
+	link->gbWaitMask |= mask;
+	for (id = 1; id < (int) link->players; ++id) {
+		if (mask & (1u << id)) {
+			_gbPlayerById(link, id)->asleep = false;
+		}
+	}
+	if (link->gbWaitMask) {
+		_gbPark(_gbPlayerById(link, 0));
+	}
+	return true;
+}
+
+static void _gbAddCycles(struct mLockstep* lockstep, int id, int32_t cycles) {
+	struct GoGBALink* link = lockstep->context;
+	if (id != 0) {
+		// A slave granting itself cycles while idle is dropped. Qt's frontend
+		// ran each GB on a thread paced to real time, which bounded that grant;
+		// from one thread it lets the slave bank time and both run ahead.
+		return;
+	}
+	int i;
+	for (i = 1; i < (int) link->players; ++i) {
+		link->gbPosted[i] += cycles;
+		if (link->gbPosted[i] > 0) {
+			_gbPlayerById(link, i)->asleep = false;
+		}
+	}
+}
+
+static int32_t _gbUseCycles(struct mLockstep* lockstep, int id, int32_t cycles) {
+	struct GoGBALink* link = lockstep->context;
+	link->gbPosted[id] -= cycles;
+	if (link->gbPosted[id] <= 0) {
+		_gbPark(_gbPlayerById(link, id));
+	}
+	return link->gbPosted[id];
+}
+
+static int32_t _gbUnusedCycles(struct mLockstep* lockstep, int id) {
+	return ((struct GoGBALink*) lockstep->context)->gbPosted[id];
+}
+
+static void _gbUnload(struct mLockstep* lockstep, int id) {
+	UNUSED(lockstep);
+	UNUSED(id);
+}
+#endif
+
 // Anything that changes emulated results is pinned here instead of read from
 // the frontend, so both ends agree whatever their settings say.
 static void _configure(struct mCore* core) {
@@ -173,6 +264,14 @@ static bool _plugIn(struct GoGBALinkPlayer* player) {
 		core->reset(core);
 		return true;
 #endif
+#ifdef M_CORE_GB
+	case mPLATFORM_GB:
+		core->reset(core);
+		GBSIOLockstepNodeCreate(&player->gbNode);
+		GBSIOLockstepAttachNode(&link->gbLockstep, &player->gbNode);
+		GBSIOSetDriver(&((struct GB*) core->board)->sio, &player->gbNode.d);
+		return true;
+#endif
 	default:
 		return false;
 	}
@@ -194,6 +293,16 @@ struct GoGBALink* GoGBALinkCreate(enum mPlatform platform, const void* rom, size
 #ifdef M_CORE_GBA
 	link->lux.readLuminance = _neutralLux;
 	GBASIOLockstepCoordinatorInit(&link->gbaCoordinator);
+#endif
+#ifdef M_CORE_GB
+	GBSIOLockstepInit(&link->gbLockstep);
+	link->gbLockstep.d.context = link;
+	link->gbLockstep.d.signal = _gbSignal;
+	link->gbLockstep.d.wait = _gbWait;
+	link->gbLockstep.d.addCycles = _gbAddCycles;
+	link->gbLockstep.d.useCycles = _gbUseCycles;
+	link->gbLockstep.d.unusedCycles = _gbUnusedCycles;
+	link->gbLockstep.d.unload = _gbUnload;
 #endif
 
 	unsigned i;
@@ -356,7 +465,16 @@ uint32_t GoGBALinkChecksum(struct GoGBALink* link) {
 			break;
 		}
 #endif
-		default:
+	#ifdef M_CORE_GB
+		case mPLATFORM_GB: {
+			struct GB* gb = core->board;
+			crc = crc32(crc, gb->memory.wram, GB_SIZE_WORKING_RAM);
+			crc = crc32(crc, gb->memory.hram, GB_SIZE_HRAM);
+			crc = crc32(crc, gb->memory.io, GB_SIZE_IO);
+			break;
+		}
+#endif
+	default:
 			break;
 		}
 	}
@@ -369,6 +487,12 @@ static void _unplug(struct GoGBALinkPlayer* player) {
 		// Setting no driver deinits the lockstep one, which removes the player
 		// from the coordinator and wakes whoever was waiting on it.
 		player->core->setPeripheral(player->core, mPERIPH_GBA_LINK_PORT, NULL);
+		break;
+#endif
+#ifdef M_CORE_GB
+	case mPLATFORM_GB:
+		GBSIOSetDriver(&((struct GB*) player->core->board)->sio, NULL);
+		GBSIOLockstepDetachNode(&player->link->gbLockstep, &player->gbNode);
 		break;
 #endif
 	default:
