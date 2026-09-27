@@ -28,19 +28,29 @@ static int checks;
 #define CHECK(cond, ...) do { ++checks; if (!(cond)) { ++failures; printf("FAIL: " __VA_ARGS__); printf("\n"); } } while (0)
 
 static uint8_t rom[LINK_GB_ROM_SIZE];
+static uint8_t cgbRom[LINK_GB_ROM_SIZE];
+static uint8_t gbaRom[LINK_GBA_ROM_SIZE];
 static uint8_t saves[RETRO_LINK_MAX_PLAYERS][SAVE_SIZE];
 static mColor localVideo[256 * 224];
 
-static struct RetroLink* makeLink(void) {
-	struct RetroLinkSave s[RETRO_LINK_MAX_PLAYERS];
+// P2 plays `p2Rom` of `p2Size` bytes; NULL for the same ROM as P1.
+static struct RetroLink* makeLinkWith(const uint8_t* p2Rom, size_t p2Size) {
+	struct RetroLinkCart c[RETRO_LINK_MAX_PLAYERS];
 	unsigned i;
 	for (i = 0; i < RETRO_LINK_MAX_PLAYERS; ++i) {
 		memset(saves[i], 0xFF, SAVE_SIZE);
 		saves[i][0] = 0x11 * (i + 1); // 0x11 for P1, 0x22 for P2
-		s[i].data = saves[i];
-		s[i].size = SAVE_SIZE;
+		c[i] = (struct RetroLinkCart) { rom, LINK_GB_ROM_SIZE, saves[i], SAVE_SIZE };
 	}
-	return RetroLinkCreate(mPLATFORM_GB, rom, LINK_GB_ROM_SIZE, 2, 0, s, 1700000000000LL, localVideo, 256);
+	if (p2Rom) {
+		c[1].rom = p2Rom;
+		c[1].romSize = p2Size;
+	}
+	return RetroLinkCreate(mPLATFORM_GB, c, 2, 0, 1700000000000LL, localVideo, 256);
+}
+
+static struct RetroLink* makeLink(void) {
+	return makeLinkWith(NULL, 0);
 }
 
 static int32_t now(struct mCore* core) {
@@ -115,6 +125,31 @@ int main(void) {
 
 	// Determinism.
 	CHECK(runAndChecksum(600) == runAndChecksum(600), "same input, different checksums");
+
+	// A GB game against a GBC one, as Pokémon Red trades with Gold: each core
+	// boots its own player's ROM, and the cable still carries bytes.
+	linkBuildGbRom(cgbRom, true);
+	link = makeLinkWith(cgbRom, sizeof(cgbRom));
+	CHECK(link, "RetroLinkCreate refused a GB and a GBC ROM");
+	a = RetroLinkCore(link, 0);
+	b = RetroLinkCore(link, 1);
+	for (f = 0; f < 600; ++f) {
+		uint16_t masks[2] = { 0, 0 };
+		RetroLinkSetInput(link, masks);
+		RetroLinkRunFrame(link);
+	}
+	CHECK(!((struct GB*) a->board)->doubleSpeed && ((struct GB*) b->board)->doubleSpeed,
+	      "players did not boot their own ROMs");
+	CHECK(a->busRead8(a, LINK_GB_COUNT) > 1 && b->busRead8(b, LINK_GB_COUNT) > 1, "mixed ROMs: no transfers");
+	endAndFree(link);
+
+	// The GB core loads any bytes; a GBA ROM on a GB cable must be refused.
+	linkBuildGbaRom(gbaRom);
+	link = makeLinkWith(gbaRom, sizeof(gbaRom));
+	CHECK(!link, "RetroLinkCreate put a GBA ROM on a GB cable");
+	if (link) {
+		endAndFree(link);
+	}
 
 	// Double speed: still one frame per step.
 	linkBuildGbRom(rom, true);

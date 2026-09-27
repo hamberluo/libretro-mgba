@@ -15,7 +15,9 @@
 #include <mgba-util/common.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #ifndef RETRO_LINK_CORE_ID
 #define RETRO_LINK_CORE_ID 0
@@ -73,6 +75,12 @@ static int16_t inputState(unsigned port, unsigned device, unsigned index, unsign
 }
 
 static uint8_t rom[LINK_GBA_ROM_SIZE];
+
+static void writeRomFile(char* path, const uint8_t* bytes, size_t size) {
+	int fd = mkstemp(path);
+	CHECK(fd >= 0 && write(fd, bytes, size) == (ssize_t) size, "could not write %s", path);
+	close(fd);
+}
 
 static void load(void) {
 	struct retro_game_info info = { .path = NULL, .data = rom, .size = sizeof(rom) };
@@ -168,6 +176,29 @@ int main(void) {
 	CHECK(retro_link_begin(2, 0, aliased, 0), "link_begin refused SAVE_RAM as the local save");
 	CHECK(((uint8_t*) saveRam)[0] == 0x42 && ((uint8_t*) saveRam)[15] == 0x42, "passing SAVE_RAM as the local save wiped it");
 	retro_unload_game();
+
+	// The other player's ROM from a file: another GBA game links, a GB game
+	// is refused and leaves the loaded one playable.
+	static uint8_t otherGba[LINK_GBA_ROM_SIZE];
+	static uint8_t gb[LINK_GB_ROM_SIZE];
+	char gbaPath[] = "/tmp/link-gba-XXXXXX";
+	char gbPath[] = "/tmp/link-gb-XXXXXX";
+	linkBuildGbaIdleRom(otherGba);
+	linkBuildGbRom(gb, false);
+	writeRomFile(gbaPath, otherGba, sizeof(otherGba));
+	writeRomFile(gbPath, gb, sizeof(gb));
+	load();
+	struct retro_link_player other[2] = { { NULL, 0, NULL }, { NULL, 0, gbaPath } };
+	CHECK(retro_link_begin(2, 0, other, 0), "link_begin refused another GBA ROM");
+	retro_run();
+	retro_unload_game();
+	load();
+	other[1].rom_path = gbPath;
+	CHECK(!retro_link_begin(2, 0, other, 0), "link_begin put a GB ROM on a GBA cable");
+	CHECK(retro_serialize_size() > 0, "a refused link_begin left the game linked");
+	retro_unload_game();
+	unlink(gbaPath);
+	unlink(gbPath);
 	retro_deinit();
 
 	printf("%d checks, %d failures\n", checks, failures);

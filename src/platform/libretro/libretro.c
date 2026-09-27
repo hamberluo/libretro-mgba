@@ -108,6 +108,8 @@ static size_t savedataSize;
 static char romPath[PATH_MAX];      // for link mode when the frontend passed a path
 static struct RetroLink* activeLink; // not `link`: that would clash with POSIX link() from <unistd.h>
 static void* linkSaves[RETRO_LINK_MAX_PLAYERS]; // remote players' save buffers
+static void* linkRoms[RETRO_LINK_MAX_PLAYERS];  // remote players' ROMs when they differ from the loaded game
+static size_t linkRomSizes[RETRO_LINK_MAX_PLAYERS];
 static struct mAVStream stream;
 static bool sensorsInitDone;
 static bool rumbleInitDone;
@@ -2790,28 +2792,44 @@ static int32_t _readGyroZ(struct mRotationSource* source) {
 	return gyroZ;
 }
 
-// Reads the ROM for link mode. `data` already holds it when the frontend
-// passed bytes; for a path it is read once here and then owned the same way,
-// so retro_unload_game frees it either way. It must outlive the local core.
-static bool _linkRomBytes(void) {
-	if (data) {
-		return true;
-	}
-	struct VFile* vf = romPath[0] ? VFileOpen(romPath, O_RDONLY) : NULL;
+static bool _readRom(const char* path, void** rom, size_t* romSize) {
+	struct VFile* vf = path[0] ? VFileOpen(path, O_RDONLY) : NULL;
 	if (!vf) {
 		return false;
 	}
 	ssize_t size = vf->size(vf);
-	data = size > 0 ? anonymousMemoryMap(size) : NULL;
-	bool ok = data && vf->read(vf, data, size) == size;
+	void* bytes = size > 0 ? anonymousMemoryMap(size) : NULL;
+	bool ok = bytes && vf->read(vf, bytes, size) == size;
 	vf->close(vf);
 	if (!ok) {
-		mappedMemoryFree(data, size);
-		data = NULL;
+		mappedMemoryFree(bytes, size);
 		return false;
 	}
-	dataSize = size;
+	*rom = bytes;
+	*romSize = size;
 	return true;
+}
+
+// Reads the ROM for link mode. `data` already holds it when the frontend
+// passed bytes; for a path it is read once here and then owned the same way,
+// so retro_unload_game frees it either way. It must outlive the local core.
+static bool _linkRomBytes(void) {
+	return data || _readRom(romPath, &data, &dataSize);
+}
+
+// Remote players' buffers; free only once their cores are gone.
+static void _freeLinkBuffers(void) {
+	unsigned i;
+	for (i = 0; i < RETRO_LINK_MAX_PLAYERS; ++i) {
+		if (linkSaves[i]) {
+			mappedMemoryFree(linkSaves[i], savedataSize);
+			linkSaves[i] = NULL;
+		}
+		if (linkRoms[i]) {
+			mappedMemoryFree(linkRoms[i], linkRomSizes[i]);
+			linkRoms[i] = NULL;
+		}
+	}
 }
 
 static void _setupLocalCore(void) {
@@ -2826,8 +2844,9 @@ static void _setupLocalCore(void) {
 }
 
 RETRO_API bool retro_link_begin(unsigned players, unsigned localPlayer,
-                                      const struct retro_link_player* saves, int64_t rtcEpochMs) {
-	if (!core || activeLink || !saves || players < 2 || players > RETRO_LINK_MAX_PLAYERS || localPlayer >= players) {
+                                      const struct retro_link_player* info, int64_t rtcEpochMs) {
+	if (!core || activeLink || !info || players < 2 || players > RETRO_LINK_MAX_PLAYERS || localPlayer >= players ||
+	    info[localPlayer].rom_path) {
 		return false;
 	}
 	if (deferredSetup) {
@@ -2836,28 +2855,36 @@ RETRO_API bool retro_link_begin(unsigned players, unsigned localPlayer,
 	if (!_linkRomBytes()) {
 		return false;
 	}
-	struct RetroLinkSave linkSave[RETRO_LINK_MAX_PLAYERS];
+	struct RetroLinkCart carts[RETRO_LINK_MAX_PLAYERS];
 	unsigned i;
+	// ROMs first: an unreadable one must fail before any save is touched.
+	for (i = 0; i < players; ++i) {
+		carts[i].rom = data;
+		carts[i].romSize = dataSize;
+		if (info[i].rom_path) {
+			if (!_readRom(info[i].rom_path, &linkRoms[i], &linkRomSizes[i])) {
+				_freeLinkBuffers();
+				return false;
+			}
+			carts[i].rom = linkRoms[i];
+			carts[i].romSize = linkRomSizes[i];
+		}
+	}
 	for (i = 0; i < players; ++i) {
 		void* buffer = i == localPlayer ? savedata : (linkSaves[i] = anonymousMemoryMap(savedataSize));
-		if (saves[i].save != buffer) {
+		if (info[i].save != buffer) {
 			memset(buffer, 0xFF, savedataSize);
-			if (saves[i].save) {
-				memcpy(buffer, saves[i].save, saves[i].save_size < savedataSize ? saves[i].save_size : savedataSize);
+			if (info[i].save) {
+				memcpy(buffer, info[i].save, info[i].save_size < savedataSize ? info[i].save_size : savedataSize);
 			}
 		}
-		linkSave[i].data = buffer;
-		linkSave[i].size = savedataSize;
+		carts[i].save = buffer;
+		carts[i].saveSize = savedataSize;
 	}
-	struct RetroLink* created = RetroLinkCreate(core->platform(core), data, dataSize, players, localPlayer,
-	                                            linkSave, rtcEpochMs, outputBuffer, VIDEO_WIDTH_MAX);
+	struct RetroLink* created = RetroLinkCreate(core->platform(core), carts, players, localPlayer, rtcEpochMs,
+	                                            outputBuffer, VIDEO_WIDTH_MAX);
 	if (!created) {
-		for (i = 0; i < players; ++i) {
-			if (linkSaves[i]) {
-				mappedMemoryFree(linkSaves[i], savedataSize);
-				linkSaves[i] = NULL;
-			}
-		}
+		_freeLinkBuffers();
 		return false;
 	}
 	// The single-player machine is replaced by the local player's linked one;
@@ -2896,11 +2923,5 @@ RETRO_API void retro_link_end(void) {
 		core->setPeripheral(core, mPERIPH_GBA_LUMINANCE, &lux);
 	}
 #endif
-	unsigned i;
-	for (i = 0; i < RETRO_LINK_MAX_PLAYERS; ++i) {
-		if (linkSaves[i]) {
-			mappedMemoryFree(linkSaves[i], savedataSize);
-			linkSaves[i] = NULL;
-		}
-	}
+	_freeLinkBuffers();
 }

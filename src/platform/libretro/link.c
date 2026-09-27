@@ -313,11 +313,10 @@ static bool _plugIn(struct RetroLinkPlayer* player) {
 	}
 }
 
-struct RetroLink* RetroLinkCreate(enum mPlatform platform, const void* rom, size_t romSize,
-                                  unsigned players, unsigned localPlayer,
-                                  const struct RetroLinkSave* saves, int64_t rtcEpochMs,
+struct RetroLink* RetroLinkCreate(enum mPlatform platform, const struct RetroLinkCart* carts,
+                                  unsigned players, unsigned localPlayer, int64_t rtcEpochMs,
                                   mColor* localVideo, size_t localStride) {
-	if (players < 2 || players > RETRO_LINK_MAX_PLAYERS || localPlayer >= players || !rom || !saves || !localVideo) {
+	if (players < 2 || players > RETRO_LINK_MAX_PLAYERS || localPlayer >= players || !carts || !localVideo) {
 		return NULL;
 	}
 	struct RetroLink* link = calloc(1, sizeof(*link));
@@ -355,7 +354,16 @@ struct RetroLink* RetroLinkCreate(enum mPlatform platform, const void* rom, size
 		mCoreInitConfig(player->core, NULL);
 		player->core->init(player->core);
 		_configure(player->core);
-		if (!player->core->loadROM(player->core, VFileFromConstMemory(rom, romSize))) {
+		struct VFile* rom = carts[i].rom ? VFileFromConstMemory(carts[i].rom, carts[i].romSize) : NULL;
+		if (!rom) {
+			goto fail;
+		}
+		// The GB core loads anything, and the coordinator is per platform.
+		if (!player->core->isROM(rom)) {
+			rom->close(rom);
+			goto fail;
+		}
+		if (!player->core->loadROM(player->core, rom)) {
 			goto fail;
 		}
 		player->core->rtc.override = RTC_FAKE_EPOCH;
@@ -372,7 +380,7 @@ struct RetroLink* RetroLinkCreate(enum mPlatform platform, const void* rom, size
 		if (!_plugIn(player)) {
 			goto fail;
 		}
-		struct VFile* save = VFileFromMemory(saves[i].data, saves[i].size);
+		struct VFile* save = VFileFromMemory(carts[i].save, carts[i].saveSize);
 		if (!player->core->loadSave(player->core, save)) {
 			save->close(save);
 		}

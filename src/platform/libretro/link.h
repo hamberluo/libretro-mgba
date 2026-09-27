@@ -19,21 +19,24 @@ CXX_GUARD_START
 
 #define RETRO_LINK_MAX_PLAYERS 2
 
-struct RetroLinkSave {
-	void* data;  // battery save buffer; the core reads and writes it in place
-	size_t size;
+// One player's cartridge. Players may hold different ROMs of one platform,
+// such as Pokémon Ruby and Sapphire, or a GB and a GBC game.
+struct RetroLinkCart {
+	const void* rom;
+	size_t romSize;
+	void* save;  // battery save buffer; the core reads and writes it in place
+	size_t saveSize;
 };
 
 struct RetroLink;
 
-// Cold-boots `players` cores of `platform` from one ROM and their saves, joined
-// by a cable. `rom`, the saves and `localVideo` are used in place and must
-// outlive every core, including the local one after RetroLinkEnd. `localVideo`
-// is needed now: a core binds its renderer at reset only if it has a buffer.
-// NULL on bad arguments or a ROM the platform rejects.
-struct RetroLink* RetroLinkCreate(enum mPlatform platform, const void* rom, size_t romSize,
-                                  unsigned players, unsigned localPlayer,
-                                  const struct RetroLinkSave* saves, int64_t rtcEpochMs,
+// Cold-boots `players` cores of `platform`, one per cart, joined by a cable.
+// The carts and `localVideo` are used in place: the local cart must outlive
+// the local core even after RetroLinkEnd, the others until RetroLinkEnd.
+// `localVideo` is needed now: a core binds its renderer at reset only if it
+// has a buffer. NULL on bad arguments or a ROM that is not for `platform`.
+struct RetroLink* RetroLinkCreate(enum mPlatform platform, const struct RetroLinkCart* carts,
+                                  unsigned players, unsigned localPlayer, int64_t rtcEpochMs,
                                   mColor* localVideo, size_t localStride);
 
 struct mCore* RetroLinkCore(struct RetroLink*, unsigned player);

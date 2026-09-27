@@ -22,15 +22,20 @@ extern "C" {
 struct retro_link_player {
 	const void* save; // battery save bytes; NULL for none
 	size_t save_size;
+	// Another player's ROM file when it differs from the loaded game (Pokémon
+	// Sapphire against a loaded Ruby); NULL for the loaded game. Must be NULL
+	// for the local player.
+	const char* rom_path;
 };
 
 // Call after retro_load_game and after writing the local save into SAVE_RAM
-// (passing SAVE_RAM itself as saves[local_player] is fine). Cold-boots every
-// player's machine from the loaded ROM and saves[i], joined by a cable; only
-// the local one is shown and heard, and SAVE_RAM becomes its save. False, with
-// nothing changed, if already linked, out of range, or no game is loaded.
+// (passing SAVE_RAM itself as players[local_player].save is fine). Cold-boots
+// every player's machine from its ROM and save, joined by a cable; only the
+// local one is shown and heard, and SAVE_RAM becomes its save. False, with
+// nothing changed, if already linked, out of range, no game is loaded, or a
+// ROM is unreadable or for another platform.
 RETRO_API bool retro_link_begin(unsigned players, unsigned local_player,
-                                      const struct retro_link_player* saves,
+                                      const struct retro_link_player* player_info,
                                       int64_t rtc_epoch_ms);
 
 // Every player's RETRO_DEVICE_ID_JOYPAD_* mask for the next retro_run.

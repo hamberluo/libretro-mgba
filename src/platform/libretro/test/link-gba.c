@@ -31,15 +31,14 @@ static uint8_t saves[RETRO_LINK_MAX_PLAYERS][0x20000];
 static mColor localVideo[256 * 224];
 
 static struct RetroLink* makeLink(const uint8_t* image, unsigned local) {
-	struct RetroLinkSave s[RETRO_LINK_MAX_PLAYERS];
+	struct RetroLinkCart c[RETRO_LINK_MAX_PLAYERS];
 	unsigned i;
 	for (i = 0; i < RETRO_LINK_MAX_PLAYERS; ++i) {
 		memset(saves[i], 0xFF, sizeof(saves[i]));
-		s[i].data = saves[i];
-		s[i].size = sizeof(saves[i]);
+		c[i] = (struct RetroLinkCart) { image, LINK_GBA_ROM_SIZE, saves[i], sizeof(saves[i]) };
 	}
 	memset(localVideo, 0, sizeof(localVideo));
-	return RetroLinkCreate(mPLATFORM_GBA, image, LINK_GBA_ROM_SIZE, 2, local, s, 1700000000000LL, localVideo, 256);
+	return RetroLinkCreate(mPLATFORM_GBA, c, 2, local, 1700000000000LL, localVideo, 256);
 }
 
 static void endAndFree(struct RetroLink* link) {
