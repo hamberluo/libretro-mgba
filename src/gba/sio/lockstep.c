@@ -937,7 +937,8 @@ void _lockstepEvent(struct mTiming* timing, void* context, uint32_t cyclesLate) 
 		if (!event) {
 			break;
 		}
-		if (event->timestamp > GBASIOLockstepTime(player)) {
+		// Past the 2^31-cycle wrap `>` reads an old event as future: never taken.
+		if (event->timestamp - GBASIOLockstepTime(player) > 0) {
 			break;
 		}
 		player->queue = event->next;
