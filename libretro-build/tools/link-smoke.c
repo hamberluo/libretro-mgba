@@ -122,8 +122,11 @@ int main(int argc, char** argv) {
 	vf->close(vf);
 	static uint8_t saveBuf[2][0x20000];
 	memset(saveBuf, 0xFF, sizeof(saveBuf));
-	struct RetroLinkSave saves[2] = { { saveBuf[0], sizeof(saveBuf[0]) }, { saveBuf[1], sizeof(saveBuf[1]) } };
-	struct RetroLink* link = RetroLinkCreate(platform, rom, size, 2, 0, saves, 1700000000000LL, video[0], 256);
+	struct RetroLinkCart carts[2] = {
+		{ rom, size, saveBuf[0], sizeof(saveBuf[0]) },
+		{ rom, size, saveBuf[1], sizeof(saveBuf[1]) },
+	};
+	struct RetroLink* link = RetroLinkCreate(platform, carts, 2, 0, 1700000000000LL, video[0], 256);
 	if (!link) {
 		fprintf(stderr, "link refused the ROM\n");
 		return 1;
