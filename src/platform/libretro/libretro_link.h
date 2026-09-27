@@ -23,8 +23,7 @@ struct retro_link_player {
 	const void* save; // battery save bytes; NULL for none
 	size_t save_size;
 	// Another player's ROM file when it differs from the loaded game (Pokémon
-	// Sapphire against a loaded Ruby); NULL for the loaded game. Must be NULL
-	// for the local player.
+	// Sapphire against a loaded Ruby); NULL for the loaded game.
 	const char* rom_path;
 };
 

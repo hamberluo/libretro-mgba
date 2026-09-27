@@ -2845,8 +2845,7 @@ static void _setupLocalCore(void) {
 
 RETRO_API bool retro_link_begin(unsigned players, unsigned localPlayer,
                                       const struct retro_link_player* info, int64_t rtcEpochMs) {
-	if (!core || activeLink || !info || players < 2 || players > RETRO_LINK_MAX_PLAYERS || localPlayer >= players ||
-	    info[localPlayer].rom_path) {
+	if (!core || activeLink || !info || players < 2 || players > RETRO_LINK_MAX_PLAYERS || localPlayer >= players) {
 		return false;
 	}
 	if (deferredSetup) {
