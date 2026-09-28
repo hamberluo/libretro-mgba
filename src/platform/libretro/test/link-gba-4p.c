@@ -45,10 +45,15 @@ static void endAndFree(struct RetroLink* link) {
 	local->deinit(local);
 }
 
-static void checksums(uint32_t out[10]) {
+// `switchView` moves the screen to another player every 60 frames: what is
+// shown must never change what is emulated.
+static void checksums(uint32_t out[10], bool switchView) {
 	struct RetroLink* link = makeLink(4);
 	unsigned frame;
 	for (frame = 0; frame < 600; ++frame) {
+		if (switchView && frame % 60 == 0) {
+			RetroLinkSetView(link, (frame / 60) % 4);
+		}
 		uint16_t masks[4];
 		unsigned p;
 		for (p = 0; p < 4; ++p) {
@@ -103,10 +108,12 @@ int main(void) {
 		endAndFree(link);
 	}
 
-	uint32_t first[10], second[10];
-	checksums(first);
-	checksums(second);
+	uint32_t first[10], second[10], switched[10];
+	checksums(first, false);
+	checksums(second, false);
 	CHECK(memcmp(first, second, sizeof(first)) == 0, "four players, same input, different checksums");
+	checksums(switched, true);
+	CHECK(memcmp(first, switched, sizeof(first)) == 0, "switching the view changed the emulated state");
 
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures != 0;

@@ -259,6 +259,28 @@ int main(void) {
 		CHECK(retro_link_save(0, &localSize) == retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) &&
 		      localSize == retro_get_memory_size(RETRO_MEMORY_SAVE_RAM), "P1's link save is not SAVE_RAM");
 		CHECK(!retro_link_save(2, &size), "a third GB player's save was returned");
+		retro_link_end();
+		retro_unload_game();
+
+		// A second cart whose save outgrows the link buffer (MBC6: 1 MiB flash)
+		// must not be reported past the buffer: frontends copy `size` bytes.
+		static uint8_t mbc6[LINK_GB_ROM_SIZE];
+		memcpy(mbc6, gbRom, sizeof(mbc6));
+		mbc6[0x147] = 0x20;
+		uint8_t check = 0;
+		int b;
+		for (b = 0x134; b < 0x14D; ++b) {
+			check = check - mbc6[b] - 1;
+		}
+		mbc6[0x14D] = check;
+		char mbc6Path[] = "/tmp/link-mbc6-XXXXXX";
+		writeRomFile(mbc6Path, mbc6, sizeof(mbc6));
+		CHECK(retro_load_game(&info), "retro_load_game refused the GB test ROM again");
+		struct retro_link_player big[2] = { { NULL, 0, NULL }, { NULL, 0, mbc6Path } };
+		CHECK(retro_link_begin(2, 0, big, 0), "link_begin refused an MBC6 second cart");
+		size = 0;
+		CHECK(retro_link_save(1, &size) && size <= 0x20000, "an MBC6 P2's save is reported as %zu bytes, past the 128 KiB link buffer", size);
+		unlink(mbc6Path);
 		// GB sound reaches the frontend through the AV stream, which follows the
 		// view; ending from P2's view must hand it back to P1.
 		retro_link_set_view(1);
