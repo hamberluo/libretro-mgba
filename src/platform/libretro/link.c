@@ -52,6 +52,9 @@ struct RetroLink {
 	enum mPlatform platform;
 	unsigned players;
 	unsigned localPlayer;
+	unsigned viewedPlayer;
+	mColor* localVideo;
+	size_t localStride;
 	struct RetroLinkPlayer player[RETRO_LINK_MAX_PLAYERS];
 	struct RetroLinkPlayer* running; // inside runLoop right now, if anyone
 	struct mRotationSource rotation;
@@ -274,6 +277,26 @@ static void _neverDraw(struct RetroLinkPlayer* player) {
 	}
 }
 
+static void _drawAgain(struct RetroLinkPlayer* player) {
+	struct mCore* core = player->core;
+	switch (player->link->platform) {
+#ifdef M_CORE_GBA
+	case mPLATFORM_GBA:
+		((struct GBA*) core->board)->video.frameskip = core->opts.frameskip;
+		((struct GBA*) core->board)->video.frameskipCounter = 0;
+		break;
+#endif
+#ifdef M_CORE_GB
+	case mPLATFORM_GB:
+		((struct GB*) core->board)->video.frameskip = core->opts.frameskip;
+		((struct GB*) core->board)->video.frameskipCounter = 0;
+		break;
+#endif
+	default:
+		break;
+	}
+}
+
 static void _destroyPlayer(struct RetroLinkPlayer* player) {
 	if (player->core) {
 		mCoreConfigDeinit(&player->core->config);
@@ -327,6 +350,9 @@ struct RetroLink* RetroLinkCreate(enum mPlatform platform, const struct RetroLin
 	link->platform = platform;
 	link->players = players;
 	link->localPlayer = localPlayer;
+	link->viewedPlayer = localPlayer;
+	link->localVideo = localVideo;
+	link->localStride = localStride;
 	link->rotation.readTiltX = _neutralTilt;
 	link->rotation.readTiltY = _neutralTilt;
 	link->rotation.readGyroZ = _neutralTilt;
@@ -417,6 +443,32 @@ struct mCore* RetroLinkLocalCore(struct RetroLink* link) {
 	return link->player[link->localPlayer].core;
 }
 
+bool RetroLinkSetView(struct RetroLink* link, unsigned player) {
+	if (player >= link->players) {
+		return false;
+	}
+	if (player == link->viewedPlayer) {
+		return true;
+	}
+	struct RetroLinkPlayer* from = &link->player[link->viewedPlayer];
+	struct RetroLinkPlayer* to = &link->player[player];
+	// Every core got a buffer before reset, so every renderer is bound; the one
+	// that stops drawing goes back to a scratch buffer of its own.
+	if (!from->scratchVideo) {
+		from->scratchVideo = calloc(256 * 224, sizeof(mColor));
+	}
+	from->core->setVideoBuffer(from->core, from->scratchVideo, 256);
+	_neverDraw(from);
+	to->core->setVideoBuffer(to->core, link->localVideo, link->localStride);
+	_drawAgain(to);
+	link->viewedPlayer = player;
+	return true;
+}
+
+struct mCore* RetroLinkViewCore(struct RetroLink* link) {
+	return link->player[link->viewedPlayer].core;
+}
+
 // libretro.c's keymap, plus its turbo cadence kept per player so each core
 // sees its own player's turbo exactly as it would in single player.
 static uint16_t _keysFromMask(struct RetroLinkPlayer* player, uint16_t mask) {
@@ -497,7 +549,7 @@ bool RetroLinkRunFrame(struct RetroLink* link) {
 		}
 	}
 	for (i = 0; i < link->players; ++i) {
-		if (i != link->localPlayer) {
+		if (i != link->viewedPlayer) {
 			mAudioBufferClear(link->player[i].core->getAudioBuffer(link->player[i].core));
 		}
 	}
@@ -557,6 +609,9 @@ static void _unplug(struct RetroLinkPlayer* player) {
 }
 
 struct mCore* RetroLinkEnd(struct RetroLink* link) {
+	// The local core must own the frontend buffer again before the viewed
+	// one's scratch buffer is freed below.
+	RetroLinkSetView(link, link->localPlayer);
 	unsigned i;
 	for (i = 0; i < link->players; ++i) {
 		_unplug(&link->player[i]);

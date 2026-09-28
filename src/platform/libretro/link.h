@@ -41,8 +41,13 @@ struct RetroLink* RetroLinkCreate(enum mPlatform platform, const struct RetroLin
                                   mColor* localVideo, size_t localStride);
 
 struct mCore* RetroLinkCore(struct RetroLink*, unsigned player);
-// The core that draws into `localVideo` and plays sound.
+// The local player's core: SAVE_RAM, and the core left after RetroLinkEnd.
 struct mCore* RetroLinkLocalCore(struct RetroLink*);
+
+// The player on screen: its core draws into `localVideo` and keeps its audio.
+// Starts as the local player. False, and nothing changes, if out of range.
+bool RetroLinkSetView(struct RetroLink*, unsigned player);
+struct mCore* RetroLinkViewCore(struct RetroLink*);
 
 // One libretro joypad mask (RETRO_DEVICE_ID_JOYPAD_* bits) per player, for the
 // next frame. X / Y / L2 / R2 are turbo A / B / L / R, as in single player.
@@ -55,8 +60,9 @@ bool RetroLinkRunFrame(struct RetroLink*);
 // CRC32 over every core's RAM and registers, for two devices to compare.
 uint32_t RetroLinkChecksum(struct RetroLink*);
 
-// Unplugs the cable, frees every core but the local one and the link itself,
-// and returns the local core, still running as a single-player game.
+// Puts the view back on the local player, unplugs the cable, frees every core
+// but the local one and the link itself, and returns the local core, still
+// running as a single-player game.
 struct mCore* RetroLinkEnd(struct RetroLink*);
 
 CXX_GUARD_END
