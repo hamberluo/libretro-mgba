@@ -1,0 +1,12 @@
+# Cores that emulate a LAN link exactly like one that already shipped, so they
+# keep its id and the two app stores need not release on the same day.
+#
+#   <source hash from link_core_id.sh>  <shipped id it answers with>
+#
+# Add a line only when link-compat passes (its golden was recorded on the
+# shipped core) and the change since then leaves 2P link emulation alone. Any
+# later source edit changes the hash, so a line never outlives its audit.
+
+# Same-device play (up to 4 GBAs, viewed player, per-player saves): 2P LAN
+# frames are untouched; the larger lockstep queue only matters past 8 events.
+29a113849bba55c0 ce073aafdeac8985

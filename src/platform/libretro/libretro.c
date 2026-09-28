@@ -1657,6 +1657,8 @@ void retro_run(void) {
 
 	}
 
+	struct mCore* shown = _outputCore();
+
 	/* Check whether current frame should
 	 * be skipped */
 	if ((frameskipType > 0)  &&
@@ -1678,15 +1680,15 @@ void retro_run(void) {
 		if (skipFrame) {
 			if(frameskipCounter < RETRO_FRAMESKIP_MAX) {
 
-				switch (core->platform(core)) {
+				switch (shown->platform(shown)) {
 #ifdef M_CORE_GBA
 				case mPLATFORM_GBA:
-					((struct GBA*) core->board)->video.frameskipCounter = 1;
+					((struct GBA*) shown->board)->video.frameskipCounter = 1;
 					break;
 #endif
 #ifdef M_CORE_GB
 				case mPLATFORM_GB:
-					((struct GB*) core->board)->video.frameskipCounter = 1;
+					((struct GB*) shown->board)->video.frameskipCounter = 1;
 					break;
 #endif
 				default:
@@ -1720,7 +1722,6 @@ void retro_run(void) {
 		core->runFrame(core);
 	}
 	unsigned width, height;
-	struct mCore* shown = _outputCore();
 	shown->currentVideoSize(shown, &width, &height);
 
 	/* If using 'Fixed Interval' frameskipping, check
