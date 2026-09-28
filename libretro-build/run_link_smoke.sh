@@ -1,6 +1,6 @@
 #!/bin/bash
 # Builds and runs tools/link-smoke.c. ROMs are the developer's own and never
-# committed. usage: ./run_link_smoke.sh rom.gba script.txt
+# committed. usage: ./run_link_smoke.sh rom.gba script.txt [players]
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -16,4 +16,4 @@ cc -g -O2 -fwrapv -w -D__LIBRETRO__ -DMINIMAL_CORE=2 -DM_CORE_GB -DM_CORE_GBA -D
 	src/platform/libretro/link.c src/core/*.c src/gba/*.c src/gba/renderers/*.c src/gba/cheats/*.c \
 	src/gba/cart/*.c src/gba/sio/*.c src/arm/*.c src/gb/*.c src/gb/mbc/*.c src/gb/sio/*.c \
 	src/gb/renderers/*.c src/sm83/*.c src/util/*.c src/util/vfs/vfs-file.c src/util/vfs/vfs-mem.c
-exec "$BUILD_DIR/link-smoke" "$1" "$2"
+exec "$BUILD_DIR/link-smoke" "$1" "$2" "${3:-2}"
