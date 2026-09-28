@@ -47,6 +47,15 @@ RETRO_API uint32_t retro_link_checksum(void);
 // Fingerprint of the emulation code; two devices may link only if equal.
 RETRO_API uint64_t retro_link_core_id(void);
 
+// Puts `player` on screen: video, audio and rumble follow it; SAVE_RAM stays
+// the local player's. Ignored without a link or for a player out of range.
+RETRO_API void retro_link_set_view(unsigned player);
+
+// `player`'s battery save while linked, and in `*size` the length a
+// single-player session of that cart would report as SAVE_RAM. NULL without a
+// link or for a player out of range. Valid until retro_link_end.
+RETRO_API const void* retro_link_save(unsigned player, size_t* size);
+
 // Unplugs the cable; the local player's game keeps running single-player.
 RETRO_API void retro_link_end(void);
 

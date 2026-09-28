@@ -61,8 +61,10 @@ static void video(const void* data, unsigned w, unsigned h, size_t pitch) {
 		}
 	}
 }
+static size_t audioFrames;
 static size_t audio(const int16_t* data, size_t frames) {
 	UNUSED(data);
+	audioFrames += frames;
 	return frames;
 }
 static void poll(void) {}
@@ -197,6 +199,77 @@ int main(void) {
 	retro_unload_game();
 	unlink(gbaPath);
 	unlink(gbPath);
+
+	// A remote player on screen: the frame is shown (not skipped because the
+	// local core stopped drawing) and it is that player's.
+	{
+		static uint8_t red[LINK_GBA_ROM_SIZE];
+		char redPath[] = "/tmp/link-red-XXXXXX";
+		linkBuildGbaRomWithBackdrop(red, 0x001F);
+		writeRomFile(redPath, red, sizeof(red));
+		load();
+		struct retro_link_player players[2] = { { NULL, 0, NULL }, { NULL, 0, redPath } };
+		CHECK(retro_link_begin(2, 0, players, 0), "link_begin refused two GBA carts");
+		retro_link_set_view(1);
+		framesShown = 0;
+		audioFrames = 0;
+		int f;
+		for (f = 0; f < 3; ++f) {
+			retro_run();
+		}
+		CHECK(framesShown == 3, "only %d of 3 frames shown while P2 is viewed", framesShown);
+		CHECK(audioFrames > 0, "no sound while P2 is viewed");
+		CHECK(pixelsShown == 0, "P1's backdrop still on screen while P2 is viewed");
+		retro_link_set_view(7);                  // out of range: ignored
+		retro_link_set_view(0);
+		retro_run();
+		retro_run();
+		CHECK(pixelsShown > 0, "P1 not back on screen after switching back");
+		retro_link_set_view(1);
+		retro_run();
+		retro_link_end();                        // from P2's view
+		retro_run();
+		retro_run();
+		CHECK(pixelsShown > 0, "after ending from P2's view, P1 is not shown");
+		retro_unload_game();
+		unlink(redPath);
+	}
+	retro_link_set_view(0);                      // no link: ignored
+	size_t none = 1;
+	CHECK(!retro_link_save(0, &none), "retro_link_save answered without a link");
+
+	// A GB cart's save is its SRAM, not the 128 KiB buffer.
+	{
+		static uint8_t gbRom[LINK_GB_ROM_SIZE];
+		linkBuildGbRom(gbRom, false);
+		struct retro_game_info info = { .path = NULL, .data = gbRom, .size = sizeof(gbRom) };
+		CHECK(retro_load_game(&info), "retro_load_game refused the GB test ROM");
+		struct retro_link_player players[2] = { { NULL, 0, NULL }, { NULL, 0, NULL } };
+		CHECK(retro_link_begin(2, 0, players, 0), "link_begin refused two GBs");
+		int f;
+		for (f = 0; f < 120; ++f) {
+			retro_run();
+		}
+		size_t size = 0;
+		const uint8_t* p2 = retro_link_save(1, &size);
+		CHECK(p2 && size == 0x2000, "P2's GB save is %zu bytes, expected 8 KiB SRAM", size);
+		// The ROM writes its transfer counter to cartridge RAM at 0xA001.
+		CHECK(p2 && p2[1] != 0xFF, "P2's save does not hold what P2's game wrote");
+		size_t localSize = 0;
+		CHECK(retro_link_save(0, &localSize) == retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) &&
+		      localSize == retro_get_memory_size(RETRO_MEMORY_SAVE_RAM), "P1's link save is not SAVE_RAM");
+		CHECK(!retro_link_save(2, &size), "a third GB player's save was returned");
+		// GB sound reaches the frontend through the AV stream, which follows the
+		// view; ending from P2's view must hand it back to P1.
+		retro_link_set_view(1);
+		retro_link_end();
+		audioFrames = 0;
+		for (f = 0; f < 10; ++f) {
+			retro_run();
+		}
+		CHECK(audioFrames > 0, "no GB sound after ending the link from P2's view");
+		retro_unload_game();
+	}
 	retro_deinit();
 
 	printf("%d checks, %d failures\n", checks, failures);

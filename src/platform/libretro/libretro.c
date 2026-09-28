@@ -81,6 +81,7 @@ static void GBARetroLog(struct mLogger* logger, int category, enum mLogLevel lev
 
 static void _postAudioBuffer(struct mAVStream*, struct mAudioBuffer*);
 static void _audioRateChanged(struct mAVStream*, unsigned rate);
+static struct mCore* _outputCore(void);
 static void _setRumble(struct mRumbleIntegrator*, float level);
 static uint8_t _readLux(struct GBALuminanceSource* lux);
 static void _updateLux(struct GBALuminanceSource* lux);
@@ -1719,20 +1720,21 @@ void retro_run(void) {
 		core->runFrame(core);
 	}
 	unsigned width, height;
-	core->currentVideoSize(core, &width, &height);
+	struct mCore* shown = _outputCore();
+	shown->currentVideoSize(shown, &width, &height);
 
 	/* If using 'Fixed Interval' frameskipping, check
 	 * whether a frame is currently available  */
 	if (frameskipType == 3) {
-		switch (core->platform(core)) {
+		switch (shown->platform(shown)) {
 	#ifdef M_CORE_GBA
 		case mPLATFORM_GBA:
-			skipFrame = ((struct GBA*) core->board)->video.frameskipCounter > 0;
+			skipFrame = ((struct GBA*) shown->board)->video.frameskipCounter > 0;
 			break;
 	#endif
 	#ifdef M_CORE_GB
 		case mPLATFORM_GB:
-			skipFrame = ((struct GB*) core->board)->video.frameskipCounter > 0;
+			skipFrame = ((struct GB*) shown->board)->video.frameskipCounter > 0;
 			break;
 	#endif
 		default:
@@ -1761,11 +1763,11 @@ void retro_run(void) {
 	}
 
 #ifdef M_CORE_GBA
-	if (core->platform(core) == mPLATFORM_GBA) {
-		struct mAudioBuffer *coreBuffer = core->getAudioBuffer(core);
+	if (shown->platform(shown) == mPLATFORM_GBA) {
+		struct mAudioBuffer *coreBuffer = shown->getAudioBuffer(shown);
         int coreSamplesAvail = mAudioBufferAvailable(coreBuffer);
         if (coreSamplesAvail > 0) {
-            unsigned coreSampleRate = core->audioSampleRate(core);
+            unsigned coreSampleRate = shown->audioSampleRate(shown);
             size_t samplesProduced;
             if (coreSampleRate != targetSampleRate) {
                 /* Resample generated audio */
@@ -2463,6 +2465,31 @@ static size_t _GBSaveRTCSuffixSize(struct mCore* core) {
 }
 #endif
 
+static size_t _saveRamSize(struct mCore* c) {
+	switch (c->platform(c)) {
+#ifdef M_CORE_GBA
+	case mPLATFORM_GBA:
+		switch (((struct GBA*) c->board)->memory.savedata.type) {
+		case GBA_SAVEDATA_AUTODETECT:
+			return GBA_SIZE_FLASH1M;
+		default:
+			return GBASavedataSize(&((struct GBA*) c->board)->memory.savedata);
+		}
+#endif
+#ifdef M_CORE_GB
+	case mPLATFORM_GB:
+		// mGBA appends MBC RTC state directly after the SRAM in the savedata
+		// buffer (see _GBMBCAppendSaveSuffix). Report that trailing region as
+		// part of SAVE_RAM so frontends that only persist SAVE_RAM (e.g. go_gba)
+		// write it to disk; otherwise the RTC is silently truncated and games
+		// like Pokémon Crystal/Prism lose the clock on every reload.
+		return ((struct GB*) c->board)->sramSize + _GBSaveRTCSuffixSize(c);
+#endif
+	default:
+		return 0;
+	}
+}
+
 void* retro_get_memory_data(unsigned id) {
 	switch (id) {
 	case RETRO_MEMORY_SAVE_RAM:
@@ -2517,29 +2544,7 @@ void* retro_get_memory_data(unsigned id) {
 size_t retro_get_memory_size(unsigned id) {
 	switch (id) {
 	case RETRO_MEMORY_SAVE_RAM:
-		switch (core->platform(core)) {
-#ifdef M_CORE_GBA
-		case mPLATFORM_GBA:
-			switch (((struct GBA*) core->board)->memory.savedata.type) {
-			case GBA_SAVEDATA_AUTODETECT:
-				return GBA_SIZE_FLASH1M;
-			default:
-				return GBASavedataSize(&((struct GBA*) core->board)->memory.savedata);
-			}
-#endif
-#ifdef M_CORE_GB
-		case mPLATFORM_GB:
-			// mGBA appends MBC RTC state directly after the SRAM in the savedata
-			// buffer (see _GBMBCAppendSaveSuffix). Report that trailing region as
-			// part of SAVE_RAM so frontends that only persist SAVE_RAM (e.g. go_gba)
-			// write it to disk; otherwise the RTC is silently truncated and games
-			// like Pokémon Crystal/Prism lose the clock on every reload.
-			return ((struct GB*) core->board)->sramSize + _GBSaveRTCSuffixSize(core);
-#endif
-		default:
-			break;
-		}
-		break;
+		return _saveRamSize(core);
 	case RETRO_MEMORY_RTC:
 #ifdef M_CORE_GB
 		return _GBSaveRTCSuffixSize(core);
@@ -2832,6 +2837,27 @@ static void _freeLinkBuffers(void) {
 	}
 }
 
+// The core the player sees and hears: the viewed one while linked.
+static struct mCore* _outputCore(void) {
+	return activeLink ? RetroLinkViewCore(activeLink) : core;
+}
+
+// Sound and rumble go with the picture.
+static void _moveOutput(struct mCore* from, struct mCore* to) {
+	if (from == to) {
+		return;
+	}
+	from->setAVStream(from, NULL);
+	from->setPeripheral(from, mPERIPH_RUMBLE, NULL);
+	to->setAVStream(to, &stream);
+	to->setPeripheral(to, mPERIPH_RUMBLE, &rumble);
+#ifdef M_CORE_GB
+	if (to->platform(to) == mPLATFORM_GB) {
+		to->setAudioBufferSize(to, GB_SAMPLES);
+	}
+#endif
+}
+
 static void _setupLocalCore(void) {
 	core->setAVStream(core, &stream);
 	core->setPeripheral(core, mPERIPH_RUMBLE, &rumble);
@@ -2906,6 +2932,25 @@ RETRO_API uint32_t retro_link_checksum(void) {
 	return activeLink ? RetroLinkChecksum(activeLink) : 0;
 }
 
+RETRO_API void retro_link_set_view(unsigned player) {
+	if (!activeLink) {
+		return;
+	}
+	struct mCore* from = RetroLinkViewCore(activeLink);
+	if (RetroLinkSetView(activeLink, player)) {
+		_moveOutput(from, RetroLinkViewCore(activeLink));
+	}
+}
+
+RETRO_API const void* retro_link_save(unsigned player, size_t* size) {
+	struct mCore* c = activeLink ? RetroLinkCore(activeLink, player) : NULL;
+	if (!c || !size) {
+		return NULL;
+	}
+	*size = _saveRamSize(c);
+	return c == core ? savedata : linkSaves[player];
+}
+
 RETRO_API uint64_t retro_link_core_id(void) {
 	return RETRO_LINK_CORE_ID;
 }
@@ -2914,6 +2959,9 @@ RETRO_API void retro_link_end(void) {
 	if (!activeLink) {
 		return;
 	}
+	// `core` is the local core for the whole session; give it the output back
+	// while the viewed one still exists.
+	_moveOutput(RetroLinkViewCore(activeLink), core);
 	core = RetroLinkEnd(activeLink);
 	activeLink = NULL;
 	core->setPeripheral(core, mPERIPH_ROTATION, &rotation);
