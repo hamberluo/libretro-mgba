@@ -105,7 +105,7 @@ int main(void) {
 	static uint8_t huge[0x40000];
 	memset(huge, 0x5A, sizeof(huge));
 	struct retro_link_player saves[2] = { { huge, sizeof(huge) }, { NULL, 0 } };
-	CHECK(!retro_link_begin(3, 0, saves, 0), "3 players accepted");
+	CHECK(!retro_link_begin(5, 0, saves, 0), "more than the maximum players accepted"); // one past the four a GBA cable links
 	CHECK(!retro_link_begin(2, 2, saves, 0), "local player 2 of 2 accepted");
 	CHECK(retro_link_begin(2, 0, saves, 1700000000000LL), "link_begin refused a loaded GBA game");
 	CHECK(!retro_link_begin(2, 0, saves, 0), "a second link_begin was accepted");

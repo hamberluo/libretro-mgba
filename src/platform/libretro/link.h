@@ -17,7 +17,8 @@ CXX_GUARD_START
 // deterministic: the same ROM, saves, epoch and input produce the same state
 // on any device.
 
-#define RETRO_LINK_MAX_PLAYERS 2
+// GBA links up to four (the multiplayer cable's limit); GB links two.
+#define RETRO_LINK_MAX_PLAYERS 4
 
 // One player's cartridge. Players may hold different ROMs of one platform,
 // such as Pokémon Ruby and Sapphire, or a GB and a GBC game.

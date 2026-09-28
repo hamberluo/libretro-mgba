@@ -188,6 +188,17 @@ int main(void) {
 	      ranA / (double) FRAME_TICKS, ranB / (double) FRAME_TICKS);
 	endAndFree(link);
 
+	// GBSIOLockstep has two slots; a third GB would be written past them.
+	{
+		static uint8_t gb3[3][0x2000];
+		struct RetroLinkCart c3[3];
+		unsigned i;
+		for (i = 0; i < 3; ++i) {
+			c3[i] = (struct RetroLinkCart) { rom, LINK_GB_ROM_SIZE, gb3[i], sizeof(gb3[i]) };
+		}
+		CHECK(!RetroLinkCreate(mPLATFORM_GB, c3, 3, 0, 0, localVideo, 256), "a three-GB link was created");
+	}
+
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures != 0;
 }

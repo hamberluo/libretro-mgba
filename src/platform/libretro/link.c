@@ -319,6 +319,10 @@ struct RetroLink* RetroLinkCreate(enum mPlatform platform, const struct RetroLin
 	if (players < 2 || players > RETRO_LINK_MAX_PLAYERS || localPlayer >= players || !carts || !localVideo) {
 		return NULL;
 	}
+	// GBSIOLockstep has two player slots.
+	if (platform == mPLATFORM_GB && players > 2) {
+		return NULL;
+	}
 	struct RetroLink* link = calloc(1, sizeof(*link));
 	link->platform = platform;
 	link->players = players;

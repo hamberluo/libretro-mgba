@@ -61,7 +61,7 @@ struct GBASIOLockstepSerializedState {
 		int32_t playerId;
 		int32_t cycleOffset;
 		uint32_t reservedPlayer[2];
-		struct GBASIOLockstepSerializedEvent events[MAX_LOCKSTEP_EVENTS];
+		struct GBASIOLockstepSerializedEvent events[MAX_LOCKSTEP_SERIALIZED_EVENTS];
 	} player;
 
 	// playerId 0 only
@@ -362,7 +362,7 @@ static bool GBASIOLockstepDriverLoadState(struct GBASIODriver* driver, const voi
 	player->queue = NULL;
 
 	struct GBASIOLockstepEvent** lastEvent = &player->queue;
-	for (i = 0; i < GBASIOLockstepSerializedFlagsGetNumEvents(flags) && i < MAX_LOCKSTEP_EVENTS; ++i) {
+	for (i = 0; i < GBASIOLockstepSerializedFlagsGetNumEvents(flags) && i < MAX_LOCKSTEP_SERIALIZED_EVENTS; ++i) {
 		struct GBASIOLockstepEvent* event = player->freeList;
 		const struct GBASIOLockstepSerializedEvent* stateEvent = &state->player.events[i];
 		player->freeList = player->freeList->next;
@@ -433,7 +433,7 @@ static void GBASIOLockstepDriverSaveState(struct GBASIODriver* driver, void** st
 
 	struct GBASIOLockstepEvent* event = player->queue;
 	size_t i;
-	for (i = 0; i < MAX_LOCKSTEP_EVENTS && event; ++i, event = event->next) {
+	for (i = 0; i < MAX_LOCKSTEP_SERIALIZED_EVENTS && event; ++i, event = event->next) {
 		struct GBASIOLockstepSerializedEvent* stateEvent = &state->player.events[i];
 		GBASIOLockstepSerializedEventFlags flags = GBASIOLockstepSerializedEventFlagsSetType(0, event->type);
 		STORE_32LE(event->timestamp, 0, &stateEvent->timestamp);

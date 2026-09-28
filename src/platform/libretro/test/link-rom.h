@@ -20,17 +20,20 @@
 #define LINK_GBA_COUNT 0x02030004   // loop iterations
 #define LINK_GBA_WORD0 0x02030008   // latest SIOMULTI0 (parent's KEYINPUT)
 #define LINK_GBA_WORD1 0x0203000A   // latest SIOMULTI1 (child's KEYINPUT)
+#define LINK_GBA_WORD2 0x0203000C   // latest SIOMULTI2
+#define LINK_GBA_WORD3 0x0203000E   // latest SIOMULTI3
 #define LINK_GBA_ROM_SIZE 0x400
 // Backdrop colour the ROM paints, BGR555. Not white: a renderer reset clears
 // its buffer to white, so a white frame does not prove the core drew it.
 #define LINK_GBA_BACKDROP 0x03E0
 
 // Multiplayer-mode SIO: each iteration every GBA sends its KEYINPUT, the
-// parent starts a transfer, and both fold what they received into EWRAM.
-static inline void linkBuildGbaRom(uint8_t rom[LINK_GBA_ROM_SIZE]) {
+// parent starts a transfer, and all fold what they received into EWRAM.
+// `backdrop` (BGR555) tells players apart on screen.
+static inline void linkBuildGbaRomWithBackdrop(uint8_t rom[LINK_GBA_ROM_SIZE], uint16_t backdrop) {
 	enum { BASE = 0xC0 };
-	static const uint32_t pool[] = { 0x04000100, LINK_GBA_ACC, 0x2003, 0x05000000, LINK_GBA_BACKDROP, 0x04000000 };
-	uint32_t code[48];
+	const uint32_t pool[] = { 0x04000100, LINK_GBA_ACC, 0x2003, 0x05000000, backdrop, 0x04000000 };
+	uint32_t code[56];
 	int lit[6][2]; // { instruction index, pool index } for each literal load
 	int nlit = 0;
 	int n = 0;
@@ -70,6 +73,10 @@ static inline void linkBuildGbaRom(uint8_t rom[LINK_GBA_ROM_SIZE]) {
 	code[n++] = LDRH(3, 5, 0x22);  // r3 = SIOMULTI1
 	code[n++] = STRH(2, 6, 0x08);
 	code[n++] = STRH(3, 6, 0x0A);
+	code[n++] = LDRH(4, 5, 0x24);  // r4 = SIOMULTI2
+	code[n++] = LDRH(8, 5, 0x26);  // r8 = SIOMULTI3
+	code[n++] = STRH(4, 6, 0x0C);
+	code[n++] = STRH(8, 6, 0x0E);
 	code[n++] = 0xE0877002;        // add r7, r7, r2
 	code[n++] = 0xE02771E3;        // eor r7, r7, r3, ror #3
 	code[n++] = 0xE5867000;        // str r7, [r6]
@@ -92,6 +99,10 @@ static inline void linkBuildGbaRom(uint8_t rom[LINK_GBA_ROM_SIZE]) {
 	rom[0xB2] = 0x96;
 	memcpy(&rom[BASE], code, n * 4);
 	memcpy(&rom[BASE + n * 4], pool, sizeof(pool));
+}
+
+static inline void linkBuildGbaRom(uint8_t rom[LINK_GBA_ROM_SIZE]) {
+	linkBuildGbaRomWithBackdrop(rom, LINK_GBA_BACKDROP);
 }
 
 // A GBA ROM that never touches the link port: `b .` after a valid entry.

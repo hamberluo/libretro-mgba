@@ -17,7 +17,11 @@ CXX_GUARD_START
 #include <mgba-util/table.h>
 #include <mgba-util/threading.h>
 
-#define MAX_LOCKSTEP_EVENTS 8
+// A parked primary cannot drain its queue while the others keep reporting to
+// it: four GBAs booting together leave it 3 attach + 6 mode events.
+#define MAX_LOCKSTEP_EVENTS 15
+// The savestate keeps upstream's layout, which has room for 8.
+#define MAX_LOCKSTEP_SERIALIZED_EVENTS 8
 
 enum GBASIOLockstepEventType {
 	SIO_EV_ATTACH,
