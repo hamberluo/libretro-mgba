@@ -1,0 +1,7 @@
+# Last upstream commit reviewed by /sync-upstream. Everything after it is new.
+# Updated in the same commit as the sync.
+#
+#   <name>  <upstream commit>  <date reviewed>
+
+mgba      c3c8e5e81  2026-09-29
+libretro  7a12d6d4b  2026-09-29
