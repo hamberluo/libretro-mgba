@@ -9,4 +9,7 @@
 
 # Same-device play (up to 4 GBAs, viewed player, per-player saves): 2P LAN
 # frames are untouched; the larger lockstep queue only matters past 8 events.
-29a113849bba55c0 ce073aafdeac8985
+# Upstream sync 2026-09-29: the GB SRAM bank fallback only fires on a non-
+# power-of-two save of 8KB or more, which no real cartridge has; the log and
+# mCoreSync edits never run under emulation.
+f69f3df47a2f98f4 ce073aafdeac8985
