@@ -13,3 +13,7 @@
 # power-of-two save of 8KB or more, which no real cartridge has; the log and
 # mCoreSync edits never run under emulation.
 f69f3df47a2f98f4 ce073aafdeac8985
+# Rewind ring (retro_rewind_*): capture runs only in the single-player branch
+# of retro_run and every link path returns before touching it; 2P frames are
+# untouched.
+956e540aba0035ee ce073aafdeac8985
