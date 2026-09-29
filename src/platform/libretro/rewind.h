@@ -29,8 +29,8 @@ void RetroRewindConfigure(struct RetroRewind*, unsigned capacity);
 void RetroRewindClear(struct RetroRewind*);
 // Call once after every emulated frame.
 void RetroRewindFrame(struct RetroRewind*, struct mCore*);
-// Loads the snapshot `seconds` back (the oldest if fewer are kept) and drops
-// it with every newer one. Returns how many seconds that was.
+// Loads the snapshot `seconds` back from now (the oldest if fewer are kept)
+// and drops every newer one. Returns how many seconds that was.
 unsigned RetroRewindStep(struct RetroRewind*, struct mCore*, unsigned seconds);
 
 CXX_GUARD_END

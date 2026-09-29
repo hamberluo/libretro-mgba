@@ -21,9 +21,9 @@ extern "C" {
 // retro_unload_game. Nothing is captured while linked.
 RETRO_API void retro_rewind_configure(unsigned seconds);
 
-// Restores the snapshot `seconds` back (the oldest if fewer are kept) and
-// drops it with every newer one. Returns the seconds rewound: 0 when nothing
-// is kept, no game is loaded, or while linked.
+// Restores the snapshot `seconds` back from now (the oldest if fewer are
+// kept) and drops every newer one. Returns the seconds rewound: 0 when
+// nothing is kept, no game is loaded, or while linked.
 RETRO_API unsigned retro_rewind_step(unsigned seconds);
 
 #ifdef __cplusplus

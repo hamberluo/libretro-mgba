@@ -95,7 +95,7 @@ int main(void) {
 	CHECK(retro_rewind_step(1) == 0, "a linked game captured snapshots");
 	retro_link_end();
 	CHECK(retro_rewind_step(1) == 0, "snapshots from the linked session survived link_end");
-	run(60);
+	run(120);
 	CHECK(retro_rewind_step(1) == 1, "capture did not resume after link_end");
 
 	retro_unload_game();

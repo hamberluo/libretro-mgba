@@ -71,15 +71,26 @@ unsigned RetroRewindStep(struct RetroRewind* rewind, struct mCore* core, unsigne
 	if (!seconds || !rewind->count) {
 		return 0;
 	}
-	unsigned back = seconds < rewind->count ? seconds : rewind->count;
+	// Seconds are counted from now: a newest snapshot under half a second old
+	// is where the player already is, so the target is one further back.
+	bool newestIsNow = rewind->frames < REWIND_FRAMES_PER_SNAPSHOT / 2;
+	unsigned back = seconds + newestIsNow;
+	if (back > rewind->count) {
+		back = rewind->count;
+	}
+	unsigned rewound = back - newestIsNow;
+	if (!rewound) {
+		return 0;
+	}
 	unsigned target = (rewind->head + rewind->capacity - back) % rewind->capacity;
 	struct VFile* slot = rewind->slots[target];
 	slot->seek(slot, 0, SEEK_SET);
 	if (!mCoreLoadStateNamed(core, slot, SAVESTATE_RTC)) {
 		return 0;
 	}
-	rewind->head = target;
-	rewind->count -= back;
+	// The loaded snapshot stays as the newest: it is exactly now.
+	rewind->head = (target + 1) % rewind->capacity;
+	rewind->count -= back - 1;
 	rewind->frames = 0;
-	return back;
+	return rewound;
 }

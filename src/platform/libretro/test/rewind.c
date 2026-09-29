@@ -49,20 +49,22 @@ int main(void) {
 
 	RetroRewindConfigure(&rewind, 4);
 	uint32_t start = core->frameCounter(core);
-	run(core, &rewind, 60 * 6); // 6 snapshots into 4 slots: the first 2 are gone
-	CHECK(RetroRewindStep(&rewind, core, 2) == 2, "step 2 of 4 kept did not rewind 2");
-	CHECK(core->frameCounter(core) == start + 60 * 5, "step 2 landed on frame %u, want %u",
-	      core->frameCounter(core) - start, 60 * 5);
-	CHECK(RetroRewindStep(&rewind, core, 5) == 2, "a step past the oldest did not stop at it");
+	run(core, &rewind, 60 * 6); // 6 snapshots into 4 slots: 3 .. 6 seconds kept
+	CHECK(RetroRewindStep(&rewind, core, 2) == 2, "step 2 did not rewind 2");
+	CHECK(core->frameCounter(core) == start + 60 * 4, "step 2 landed on frame %u, want %u",
+	      core->frameCounter(core) - start, 60 * 4);
+	CHECK(RetroRewindStep(&rewind, core, 5) == 1, "a step past the oldest did not stop at it");
 	CHECK(core->frameCounter(core) == start + 60 * 3, "the oldest kept is frame %u, want %u",
 	      core->frameCounter(core) - start, 60 * 3);
 	CHECK(RetroRewindStep(&rewind, core, 1) == 0, "an emptied ring still rewound");
 
-	// Capturing resumes from the restored point.
-	run(core, &rewind, 60);
-	CHECK(RetroRewindStep(&rewind, core, 1) == 1, "no snapshot after rewinding and playing on");
-	CHECK(core->frameCounter(core) == start + 60 * 4, "resumed capture landed on frame %u, want %u",
-	      core->frameCounter(core) - start, 60 * 4);
+	// A snapshot under half a second old is where the player already is.
+	run(core, &rewind, 10);
+	CHECK(RetroRewindStep(&rewind, core, 1) == 0, "10 frames back counted as a second");
+	run(core, &rewind, 40);
+	CHECK(RetroRewindStep(&rewind, core, 1) == 1, "50 frames back did not count as a second");
+	CHECK(core->frameCounter(core) == start + 60 * 3, "the half-second step landed on frame %u, want %u",
+	      core->frameCounter(core) - start, 60 * 3);
 
 	run(core, &rewind, 120);
 	RetroRewindClear(&rewind);
