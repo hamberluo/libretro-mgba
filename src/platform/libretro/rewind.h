@@ -15,7 +15,8 @@ struct VFile;
 
 // One full savestate per 60 emulated frames, the newest `capacity` kept.
 // Whole states rather than mGBA's per-frame deltas: at one per second a ring
-// of 30 GBA states is ~11 MB, and a capture costs ~10 us on a host.
+// of 30 GBA states is ~15 MB (each chunk rounds up to a power of two), and a
+// capture costs ~10 us on a host.
 struct RetroRewind {
 	struct VFile** slots;
 	unsigned capacity;

@@ -16,4 +16,4 @@ f69f3df47a2f98f4 ce073aafdeac8985
 # Rewind ring (retro_rewind_*): capture runs only in the single-player branch
 # of retro_run and every link path returns before touching it; 2P frames are
 # untouched.
-c54553b0a163d1b9 ce073aafdeac8985
+bbe888dfa52ca3f2 ce073aafdeac8985

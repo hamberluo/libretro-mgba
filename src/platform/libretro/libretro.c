@@ -1504,6 +1504,7 @@ void retro_init(void) {
 }
 
 void retro_deinit(void) {
+	RetroRewindConfigure(&rewindRing, 0);
 	if (outputBuffer) {
 #ifdef _3DS
 		linearFree(outputBuffer);
