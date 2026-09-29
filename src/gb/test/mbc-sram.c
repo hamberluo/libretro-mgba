@@ -160,6 +160,19 @@ int main(void) {
 		    gb.memory.sramBank >= regularCart
 		    && gb.memory.sramBank + GB_SIZE_EXTERNAL_RAM <= regularCart + sizeof(regularCart));
 	}
+	{
+		// A 24KB save: bank 3 still overflows after masking to the 32KB power of
+		// two, which used to return with sramBank left at the old cartridge.
+		struct GB gb;
+		memset(&gb, 0, sizeof(gb));
+		gb.memory.sram = regularCart;
+		gb.memory.sramBank = previousCart;
+		gb.sramSize = GB_SIZE_EXTERNAL_RAM * 3;
+
+		GBMBCSwitchSramBank(&gb, 3);
+		ok("an unmaskable bank on a 24KB save falls back to bank 0",
+		    gb.memory.sramBank == regularCart && gb.memory.sramCurrentBank == 0);
+	}
 
 	printf("\n%d checks, %d failed\n", checks, failures);
 	return failures != 0;

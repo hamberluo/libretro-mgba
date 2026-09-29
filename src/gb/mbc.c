@@ -290,7 +290,7 @@ void GBMBCSwitchSramBank(struct GB* gb, int bank) {
 		}
 		bankStart &= toPow2(gb->sramSize) - 1;
 		if (bankStart + GB_SIZE_EXTERNAL_RAM > gb->sramSize) {
-			return;
+			bankStart = 0;
 		}
 		bank = bankStart / GB_SIZE_EXTERNAL_RAM;
 	}
@@ -318,7 +318,7 @@ void GBMBCSwitchSramHalfBank(struct GB* gb, int half, int bank) {
 		}
 		bankStart &= toPow2(gb->sramSize) - 1;
 		if (bankStart + GB_SIZE_EXTERNAL_RAM_HALFBANK > (ssize_t) gb->sramSize) {
-			return;
+			bankStart = 0;
 		}
 		bank = bankStart / GB_SIZE_EXTERNAL_RAM_HALFBANK;
 	}
