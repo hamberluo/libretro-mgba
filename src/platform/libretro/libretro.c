@@ -44,6 +44,8 @@ FS_Archive sdmcArchive;
 
 #include "libretro_core_options.h"
 #include "libretro_link.h"
+#include "libretro_rewind.h"
+#include "rewind.h"
 #include "link.h"
 
 #ifdef HAVE_LINK_CORE_ID_H
@@ -108,6 +110,7 @@ static void* savedata;
 static size_t savedataSize;
 static char romPath[PATH_MAX];      // for link mode when the frontend passed a path
 static struct RetroLink* activeLink; // not `link`: that would clash with POSIX link() from <unistd.h>
+static struct RetroRewind rewindRing;
 static void* linkSaves[RETRO_LINK_MAX_PLAYERS]; // remote players' save buffers
 static void* linkRoms[RETRO_LINK_MAX_PLAYERS];  // remote players' ROMs when they differ from the loaded game
 static size_t linkRomSizes[RETRO_LINK_MAX_PLAYERS];
@@ -1720,6 +1723,7 @@ void retro_run(void) {
 		}
 	} else {
 		core->runFrame(core);
+		RetroRewindFrame(&rewindRing, core);
 	}
 	unsigned width, height;
 	shown->currentVideoSize(shown, &width, &height);
@@ -1989,6 +1993,7 @@ void retro_reset(void) {
 		return;
 	}
 	core->reset(core);
+	RetroRewindClear(&rewindRing);
 	mRumbleIntegratorReset(&rumble);
 	_setupMaps(core);
 }
@@ -2220,6 +2225,7 @@ void retro_unload_game(void) {
 	if (!core) {
 		return;
 	}
+	RetroRewindConfigure(&rewindRing, 0);
 	if (activeLink) {
 		retro_link_end();
 	}
@@ -2280,6 +2286,9 @@ bool retro_unserialize(const void* data, size_t size) {
 	struct VFile* vfm = VFileFromConstMemory(data, size);
 	bool success = mCoreLoadStateNamed(core, vfm, SAVESTATE_RTC);
 	vfm->close(vfm);
+	if (success) {
+		RetroRewindClear(&rewindRing);
+	}
 	return success;
 }
 
@@ -2918,6 +2927,8 @@ RETRO_API bool retro_link_begin(unsigned players, unsigned localPlayer,
 	activeLink = created;
 	core = RetroLinkLocalCore(activeLink);
 	_setupLocalCore();
+	// The snapshots belong to the machine that was just replaced.
+	RetroRewindClear(&rewindRing);
 	return true;
 }
 
@@ -2970,4 +2981,16 @@ RETRO_API void retro_link_end(void) {
 	}
 #endif
 	_freeLinkBuffers();
+}
+
+/* GoGBA extension: see libretro_rewind.h. */
+RETRO_API void retro_rewind_configure(unsigned seconds) {
+	RetroRewindConfigure(&rewindRing, seconds);
+}
+
+RETRO_API unsigned retro_rewind_step(unsigned seconds) {
+	if (!core || activeLink) {
+		return 0;
+	}
+	return RetroRewindStep(&rewindRing, core, seconds);
 }
