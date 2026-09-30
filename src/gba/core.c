@@ -857,17 +857,22 @@ static void _GBACoreReset(struct mCore* core) {
 
 	ARMReset(core->cpu);
 	bool forceSkip = gba->mbVf || (core->opts.skipBios && (gba->romVf || gba->memory.rom));
-	if (!forceSkip && (gba->romVf || gba->memory.rom) && gba->pristineRomSize >= 0xA0 && gba->biosVf) {
-		uint32_t crc = doCrc32(&gba->memory.rom[1], 0x9C);
-		if (crc != LOGO_CRC32) {
-			// The BIOS locks up on a logo it does not recognise, which modified
-			// ROMs often carry. Restore it in the working copy instead of skipping
-			// the boot animation; the file itself is untouched.
-			mLOG(STATUS, WARN, "Invalid logo, restoring it for the BIOS");
-			size_t i;
+	if (!forceSkip && (gba->romVf || gba->memory.rom) && gba->pristineRomSize >= 0xC0 && gba->biosVf) {
+		// The BIOS locks up on a logo or header checksum it does not accept,
+		// which modified ROMs often carry. Fix both in the working copy instead
+		// of skipping the boot animation; the file itself is untouched.
+		const uint8_t* header = (const uint8_t*) gba->memory.rom;
+		uint8_t checksum = (uint8_t) -0x19;
+		size_t i;
+		for (i = 0xA0; i < 0xBD; ++i) {
+			checksum -= header[i];
+		}
+		if (doCrc32(&header[4], 0x9C) != LOGO_CRC32 || header[0xBD] != checksum) {
+			mLOG(STATUS, WARN, "Invalid header, repairing it for the BIOS");
 			for (i = 0; i < sizeof(_gbaLogo); ++i) {
 				GBAPatch8(core->cpu, GBA_BASE_ROM0 + 4 + i, _gbaLogo[i], NULL);
 			}
+			GBAPatch8(core->cpu, GBA_BASE_ROM0 + 0xBD, checksum, NULL);
 		}
 	}
 
