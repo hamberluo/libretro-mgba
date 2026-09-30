@@ -59,6 +59,27 @@ int main(void) {
 	}
 	core->deinit(core);
 
-	printf("3 checks, %d failures\n", failures);
+	// Sachen mappers scramble the boot ROM's header reads, so a real cart
+	// passes with bytes that look wrong here; repairing them makes it hang.
+	memset(rom, 0, sizeof(rom));
+	rom[0x104] = 0xCE;
+	rom[0x144] = 0xED;
+	rom[0x114] = 0x66;
+	rom[0x154] = 0x66;
+	core = GBCoreCreate();
+	core->init(core);
+	core->loadROM(core, VFileFromConstMemory(rom, sizeof(rom)));
+	gb = core->board;
+	gb->biosVf = VFileFromConstMemory(bios, sizeof(bios));
+	GBMapBIOS(gb);
+	if (memcmp(&gb->memory.romBase[0x100], &rom[0x100], 0x50) != 0) {
+		printf("FAIL: Sachen header was repaired\n");
+		++failures;
+	}
+	gb->memory.io[GB_REG_BANK] = 0xFF;
+	GBUnmapBIOS(gb);
+	core->deinit(core);
+
+	printf("4 checks, %d failures\n", failures);
 	return failures != 0;
 }

@@ -30,8 +30,6 @@ static uint8_t headerChecksum(const uint8_t* rom) {
 	return checksum;
 }
 
-// Boots rom and checks the BIOS was not skipped and sees a valid header,
-// leaving that header in `booted`.
 static void boot(const char* name, const uint8_t* rom, size_t size, uint8_t* booted) {
 	struct mCore* core = GBACoreCreate();
 	core->init(core);
