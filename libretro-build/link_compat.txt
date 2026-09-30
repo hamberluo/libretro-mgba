@@ -17,3 +17,6 @@ f69f3df47a2f98f4 ce073aafdeac8985
 # of retro_run and every link path returns before touching it; 2P frames are
 # untouched.
 bbe888dfa52ca3f2 ce073aafdeac8985
+# Invalid-logo boot: the logo is restored only when a BIOS is loaded, and link
+# cores pin useBios off, so 2P frames are untouched.
+fc7e1d2467f0439e ce073aafdeac8985
