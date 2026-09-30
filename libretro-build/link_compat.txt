@@ -20,3 +20,6 @@ bbe888dfa52ca3f2 ce073aafdeac8985
 # Invalid-logo boot: the logo is restored only when a BIOS is loaded, and link
 # cores pin useBios off, so 2P frames are untouched.
 fc7e1d2467f0439e ce073aafdeac8985
+# GB boot header: only the boot-time copy of bank 0 is patched, which exists
+# only when a boot ROM is mapped; link cores pin useBios off.
+fe0872213908a148 ce073aafdeac8985
