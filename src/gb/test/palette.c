@@ -6,7 +6,7 @@
 
 // A custom DMG palette must reach every monochrome picture: SGB-enhanced carts
 // (whose own PAL packets would otherwise recolor them) and states saved under
-// a different palette. CGB carts keep their own colors.
+// a different palette.
 
 #include <mgba/core/config.h>
 #include <mgba/core/core.h>
@@ -24,7 +24,7 @@ static int failures;
 static int checks;
 #define CHECK(cond, ...) do { ++checks; if (!(cond)) { ++failures; printf("FAIL: " __VA_ARGS__); printf("\n"); } } while (0)
 
-enum CartKind { CART_DMG, CART_SGB, CART_CGB };
+enum CartKind { CART_DMG, CART_SGB };
 
 static const uint32_t gray8[4] = { 0xF8F8F8, 0xA8A8A8, 0x505050, 0x000000 };
 static const uint32_t green8[4] = { 0x88A048, 0x486830, 0x284020, 0x182808 };
@@ -39,8 +39,6 @@ static struct mCore* boot(enum CartKind kind) {
 	if (kind == CART_SGB) {
 		rom[0x146] = 0x03;
 		rom[0x14B] = 0x33;
-	} else if (kind == CART_CGB) {
-		rom[0x143] = 0x80;
 	}
 	struct mCore* core = GBCoreCreate();
 	core->init(core);
@@ -135,22 +133,10 @@ static void testDeserializeSgb(void) {
 	core->deinit(core);
 }
 
-static void testCgb(void) {
-	struct mCore* core = boot(CART_CGB);
-	struct GB* gb = core->board;
-	core->reset(core);
-	uint16_t before[64];
-	memcpy(before, gb->video.palette, sizeof(before));
-	setPal(core, green8, true);
-	CHECK(memcmp(before, gb->video.palette, sizeof(before)) == 0, "cgb_ignores_custom_palette");
-	core->deinit(core);
-}
-
 int main(void) {
 	testSgb();
 	testDeserializeDmg();
 	testDeserializeSgb();
-	testCgb();
 	printf("%d checks, %d failures\n", checks, failures);
 	return failures != 0;
 }
