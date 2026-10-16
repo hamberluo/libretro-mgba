@@ -21,3 +21,8 @@ bbe888dfa52ca3f2 ce073aafdeac8985
 # in the boot-time copy of bank 0): both run only with a BIOS loaded, and link
 # cores pin useBios off, so 2P frames are untouched.
 5172c407ea5ba09a ce073aafdeac8985
+# GB custom palette (mgba_gb_colors, SGB colorization off when non-default):
+# writes only output palette slots, which the link checksum (WRAM/HRAM/IO)
+# never reads; with the frontend's default Grayscale nothing changes, and
+# link-compat passes, so 2P frames are untouched.
+189682ac080fe4f2 ce073aafdeac8985

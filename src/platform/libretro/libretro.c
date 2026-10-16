@@ -1182,6 +1182,9 @@ static void _updateGbPal(void) {
 			mCoreConfigSetUIntValue(&core->config, "gb.pal[9]", presets[i].colors[9] & 0xFFFFFF);
 			mCoreConfigSetUIntValue(&core->config, "gb.pal[10]", presets[i].colors[10] & 0xFFFFFF);
 			mCoreConfigSetUIntValue(&core->config, "gb.pal[11]", presets[i].colors[11] & 0xFFFFFF);
+			// Grayscale is the frontend's "Default": SGB carts keep their own colors.
+			mCoreConfigSetIntValue(&core->config, "sgb.customPalette", strcmp(presets[i].name, "Grayscale") != 0);
+			core->reloadConfigOption(core, "sgb.customPalette", NULL);
 			core->reloadConfigOption(core, "gb.pal", NULL);
 			break;
 		}
