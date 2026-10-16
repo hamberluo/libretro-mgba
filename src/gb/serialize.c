@@ -211,6 +211,8 @@ bool GBDeserialize(struct GB* gb, const struct GBSerializedState* state) {
 	GBMemoryDeserialize(gb, state);
 	GBVideoDeserialize(&gb->video, state);
 	GBIODeserialize(gb, state);
+	// The saved slots reflect the palette chosen back then, not the current one.
+	GBVideoRefreshDmgPalette(&gb->video);
 	GBTimerDeserialize(&gb->timer, state);
 	GBAudioDeserialize(&gb->audio, state);
 

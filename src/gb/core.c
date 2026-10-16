@@ -333,6 +333,15 @@ static void _GBCoreReloadConfigOption(struct mCore* core, const char* option, co
 		}
 	}
 
+	// Stored only; the gb.pal reload that follows repaints.
+	if (strcmp("sgb.customPalette", option) == 0) {
+		int custom;
+		if (mCoreConfigGetIntValue(config, "sgb.customPalette", &custom)) {
+			gb->video.sgbCustomPalette = custom;
+		}
+		return;
+	}
+
 	if (strcmp("gb.pal", option) == 0) {
 		int color;
 		if (mCoreConfigGetIntValue(config, "gb.pal[0]", &color)) {
@@ -371,11 +380,7 @@ static void _GBCoreReloadConfigOption(struct mCore* core, const char* option, co
 		if (mCoreConfigGetIntValue(config, "gb.pal[11]", &color)) {
 			GBVideoSetPalette(&gb->video, 11, color);
 		}
-		if (gb->model < GB_MODEL_SGB) {
-			GBVideoWritePalette(&gb->video, GB_REG_BGP, gb->memory.io[GB_REG_BGP]);
-			GBVideoWritePalette(&gb->video, GB_REG_OBP0, gb->memory.io[GB_REG_OBP0]);
-			GBVideoWritePalette(&gb->video, GB_REG_OBP1, gb->memory.io[GB_REG_OBP1]);
-		}
+		GBVideoRefreshDmgPalette(&gb->video);
 	}
 }
 

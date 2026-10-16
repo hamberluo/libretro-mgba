@@ -307,6 +307,7 @@ void GBVideoInit(struct GBVideo* video) {
 	video->dmgPalette[11] = 0x0000;
 
 	video->sgbBorders = true;
+	video->sgbCustomPalette = false;
 }
 
 void GBVideoReset(struct GBVideo* video) {
@@ -417,6 +418,9 @@ void GBVideoReset(struct GBVideo* video) {
 	video->renderer->writePalette(video->renderer, 9 * 4 + 1, video->palette[9 * 4 + 1]);
 	video->renderer->writePalette(video->renderer, 9 * 4 + 2, video->palette[9 * 4 + 2]);
 	video->renderer->writePalette(video->renderer, 9 * 4 + 3, video->palette[9 * 4 + 3]);
+	// SGB slots 4-15 are otherwise empty until the game's first PAL packet,
+	// which the custom palette ignores.
+	GBVideoRefreshDmgPalette(video);
 
 	mTimingSchedule(&video->p->timing, &video->frameEvent, GB_VIDEO_TOTAL_LENGTH << 1);
 }
@@ -886,6 +890,25 @@ void GBVideoSetPalette(struct GBVideo* video, unsigned index, uint32_t color) {
 	video->dmgPalette[index] = M_RGB8_TO_RGB5(color);
 }
 
+void GBVideoRefreshDmgPalette(struct GBVideo* video) {
+	if (video->p->model < GB_MODEL_SGB) {
+		GBVideoWritePalette(video, GB_REG_BGP, video->p->memory.io[GB_REG_BGP]);
+		GBVideoWritePalette(video, GB_REG_OBP0, video->p->memory.io[GB_REG_OBP0]);
+		GBVideoWritePalette(video, GB_REG_OBP1, video->p->memory.io[GB_REG_OBP1]);
+		return;
+	}
+	if ((video->p->model & (GB_MODEL_SGB | GB_MODEL_CGB)) != GB_MODEL_SGB || !video->sgbCustomPalette) {
+		return;
+	}
+	// SGB maps BGP/OBP to shades in the renderer's lookup; the slots hold the
+	// four shades of each attribute palette, so all four get the same set.
+	int i;
+	for (i = 0; i < 16; ++i) {
+		video->palette[i] = video->dmgPalette[i & 3];
+		video->renderer->writePalette(video->renderer, i, video->palette[i]);
+	}
+}
+
 void GBVideoDisableCGB(struct GBVideo* video) {
 	video->dmgPalette[0] = video->palette[0];
 	video->dmgPalette[1] = video->palette[1];
@@ -921,6 +944,9 @@ void GBVideoWriteSGBPacket(struct GBVideo* video, uint8_t* data) {
 	}
 	switch (video->sgbCommandHeader >> 3) {
 	case SGB_PAL01:
+		if (video->sgbCustomPalette) {
+			break;
+		}
 		video->palette[0] = video->sgbPacketBuffer[1] | (video->sgbPacketBuffer[2] << 8);
 		video->palette[1] = video->sgbPacketBuffer[3] | (video->sgbPacketBuffer[4] << 8);
 		video->palette[2] = video->sgbPacketBuffer[5] | (video->sgbPacketBuffer[6] << 8);
@@ -946,6 +972,9 @@ void GBVideoWriteSGBPacket(struct GBVideo* video, uint8_t* data) {
 		video->renderer->writePalette(video->renderer, 12, video->palette[12]);
 		break;
 	case SGB_PAL23:
+		if (video->sgbCustomPalette) {
+			break;
+		}
 		video->palette[9] = video->sgbPacketBuffer[3] | (video->sgbPacketBuffer[4] << 8);
 		video->palette[10] = video->sgbPacketBuffer[5] | (video->sgbPacketBuffer[6] << 8);
 		video->palette[11] = video->sgbPacketBuffer[7] | (video->sgbPacketBuffer[8] << 8);
@@ -961,6 +990,9 @@ void GBVideoWriteSGBPacket(struct GBVideo* video, uint8_t* data) {
 		video->renderer->writePalette(video->renderer, 15, video->palette[15]);
 		break;
 	case SGB_PAL03:
+		if (video->sgbCustomPalette) {
+			break;
+		}
 		video->palette[0] = video->sgbPacketBuffer[1] | (video->sgbPacketBuffer[2] << 8);
 		video->palette[1] = video->sgbPacketBuffer[3] | (video->sgbPacketBuffer[4] << 8);
 		video->palette[2] = video->sgbPacketBuffer[5] | (video->sgbPacketBuffer[6] << 8);
@@ -985,6 +1017,9 @@ void GBVideoWriteSGBPacket(struct GBVideo* video, uint8_t* data) {
 		video->renderer->writePalette(video->renderer, 15, video->palette[15]);
 		break;
 	case SGB_PAL12:
+		if (video->sgbCustomPalette) {
+			break;
+		}
 		video->palette[5] = video->sgbPacketBuffer[3] | (video->sgbPacketBuffer[4] << 8);
 		video->palette[6] = video->sgbPacketBuffer[5] | (video->sgbPacketBuffer[6] << 8);
 		video->palette[7] = video->sgbPacketBuffer[7] | (video->sgbPacketBuffer[8] << 8);
@@ -1000,6 +1035,9 @@ void GBVideoWriteSGBPacket(struct GBVideo* video, uint8_t* data) {
 		video->renderer->writePalette(video->renderer, 11, video->palette[11]);
 		break;
 	case SGB_PAL_SET:
+		if (video->sgbCustomPalette) {
+			break;
+		}
 		for (i = 0; i < 4; ++i) {
 			uint16_t entry = (video->sgbPacketBuffer[2 + (i * 2)] << 8) | video->sgbPacketBuffer[1 + (i * 2)];
 			if (entry >= 0x200) {

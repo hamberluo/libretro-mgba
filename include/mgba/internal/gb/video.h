@@ -165,6 +165,8 @@ struct GBVideo {
 	uint16_t palette[64];
 
 	bool sgbBorders;
+	// Not serialized: the frontend re-sends it on every load.
+	bool sgbCustomPalette;
 
 	uint32_t frameCounter;
 	int frameskip;
@@ -189,6 +191,7 @@ void GBVideoSwitchBank(struct GBVideo* video, uint8_t value);
 
 void GBVideoDisableCGB(struct GBVideo* video);
 void GBVideoSetPalette(struct GBVideo* video, unsigned index, uint32_t color);
+void GBVideoRefreshDmgPalette(struct GBVideo* video);
 
 void GBVideoWriteSGBPacket(struct GBVideo* video, uint8_t* data);
 
