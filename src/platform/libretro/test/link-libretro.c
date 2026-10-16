@@ -35,7 +35,17 @@ static int pixelsShown;
 // While set, the frontend reports a changed core option that alters emulation.
 static bool optionChanged;
 
+// GB palette the frontend answers for mgba_gb_colors; NULL leaves it unset.
+static const char* gbColors;
+// Pixels of DMG Green's lightest shade in the last frame.
+static int greenShown;
+#define DMG_GREEN_LIGHTEST 0x2691
+
 static bool env(unsigned cmd, void* data) {
+	if (gbColors && cmd == RETRO_ENVIRONMENT_GET_VARIABLE && !strcmp(((struct retro_variable*) data)->key, "mgba_gb_colors")) {
+		((struct retro_variable*) data)->value = gbColors;
+		return true;
+	}
 	if (optionChanged && cmd == RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE) {
 		*(bool*) data = true;
 		return true;
@@ -52,11 +62,14 @@ static bool env(unsigned cmd, void* data) {
 static void video(const void* data, unsigned w, unsigned h, size_t pitch) {
 	framesShown += data != NULL;
 	pixelsShown = 0;
+	greenShown = 0;
 	if (data) {
 		unsigned x, y;
 		for (y = 0; y < h; ++y) {
 			for (x = 0; x < w; ++x) {
-				pixelsShown += ((const uint16_t*) ((const uint8_t*) data + y * pitch))[x] == LINK_GBA_BACKDROP;
+				uint16_t pixel = ((const uint16_t*) ((const uint8_t*) data + y * pitch))[x];
+				pixelsShown += pixel == LINK_GBA_BACKDROP;
+				greenShown += pixel == DMG_GREEN_LIGHTEST;
 			}
 		}
 	}
@@ -291,6 +304,28 @@ int main(void) {
 		}
 		CHECK(audioFrames > 0, "no GB sound after ending the link from P2's view");
 		retro_unload_game();
+
+		// Linking swaps in freshly configured cores; the palette must follow.
+		gbColors = "DMG Green";
+		CHECK(retro_load_game(&info), "retro_load_game refused the GB test ROM for the palette check");
+		for (f = 0; f < 10; ++f) {
+			retro_run();
+		}
+		CHECK(greenShown > 0, "unlinked GB game ignored the palette");
+		struct retro_link_player pair[2] = { { NULL, 0, NULL }, { NULL, 0, NULL } };
+		CHECK(retro_link_begin(2, 0, pair, 0), "link_begin refused two GBs for the palette check");
+		for (f = 0; f < 10; ++f) {
+			retro_run();
+		}
+		CHECK(greenShown > 0, "linked P1 lost the GB palette");
+		retro_link_set_view(1);
+		for (f = 0; f < 10; ++f) {
+			retro_run();
+		}
+		CHECK(greenShown > 0, "linked P2's view lost the GB palette");
+		retro_link_end();
+		retro_unload_game();
+		gbColors = NULL;
 	}
 	retro_deinit();
 

@@ -1158,36 +1158,44 @@ static void _initRumble(void) {
 }
 
 #ifdef M_CORE_GB
+static void _applyGbPal(struct mCore* target, const struct GBColorPreset* preset) {
+	char key[16];
+	int i;
+	for (i = 0; i < 12; ++i) {
+		snprintf(key, sizeof(key), "gb.pal[%d]", i);
+		mCoreConfigSetUIntValue(&target->config, key, preset->colors[i] & 0xFFFFFF);
+	}
+	// Grayscale is the frontend's "Default": SGB carts keep their own colors.
+	mCoreConfigSetIntValue(&target->config, "sgb.customPalette", strcmp(preset->name, "Grayscale") != 0);
+	target->reloadConfigOption(target, "sgb.customPalette", NULL);
+	target->reloadConfigOption(target, "gb.pal", NULL);
+}
+
+// Linked cores are built with a fresh config, and any of them can be the view.
 static void _updateGbPal(void) {
 	struct retro_variable var;
 	var.key = "mgba_gb_colors";
 	var.value = 0;
-	if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-		const struct GBColorPreset* presets;
-		size_t listSize = GBColorPresetList(&presets);
-		size_t i;
-		for (i = 0; i < listSize; ++i) {
-			if (strcmp(presets[i].name, var.value) != 0) {
-				continue;
-			}
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[0]", presets[i].colors[0] & 0xFFFFFF);
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[1]", presets[i].colors[1] & 0xFFFFFF);
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[2]", presets[i].colors[2] & 0xFFFFFF);
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[3]", presets[i].colors[3] & 0xFFFFFF);
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[4]", presets[i].colors[4] & 0xFFFFFF);
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[5]", presets[i].colors[5] & 0xFFFFFF);
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[6]", presets[i].colors[6] & 0xFFFFFF);
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[7]", presets[i].colors[7] & 0xFFFFFF);
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[8]", presets[i].colors[8] & 0xFFFFFF);
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[9]", presets[i].colors[9] & 0xFFFFFF);
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[10]", presets[i].colors[10] & 0xFFFFFF);
-			mCoreConfigSetUIntValue(&core->config, "gb.pal[11]", presets[i].colors[11] & 0xFFFFFF);
-			// Grayscale is the frontend's "Default": SGB carts keep their own colors.
-			mCoreConfigSetIntValue(&core->config, "sgb.customPalette", strcmp(presets[i].name, "Grayscale") != 0);
-			core->reloadConfigOption(core, "sgb.customPalette", NULL);
-			core->reloadConfigOption(core, "gb.pal", NULL);
-			break;
+	if (!environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) || !var.value) {
+		return;
+	}
+	const struct GBColorPreset* presets;
+	size_t listSize = GBColorPresetList(&presets);
+	size_t i;
+	for (i = 0; i < listSize; ++i) {
+		if (strcmp(presets[i].name, var.value) != 0) {
+			continue;
 		}
+		if (!activeLink) {
+			_applyGbPal(core, &presets[i]);
+			return;
+		}
+		struct mCore* player;
+		unsigned p;
+		for (p = 0; (player = RetroLinkCore(activeLink, p)); ++p) {
+			_applyGbPal(player, &presets[i]);
+		}
+		return;
 	}
 }
 #endif
@@ -2931,6 +2939,9 @@ RETRO_API bool retro_link_begin(unsigned players, unsigned localPlayer,
 	activeLink = created;
 	core = RetroLinkLocalCore(activeLink);
 	_setupLocalCore();
+#ifdef M_CORE_GB
+	_updateGbPal();
+#endif
 	// The snapshots belong to the machine that was just replaced.
 	RetroRewindClear(&rewindRing);
 	return true;

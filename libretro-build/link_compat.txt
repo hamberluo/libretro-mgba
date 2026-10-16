@@ -25,4 +25,4 @@ bbe888dfa52ca3f2 ce073aafdeac8985
 # writes only output palette slots, which the link checksum (WRAM/HRAM/IO)
 # never reads; with the frontend's default Grayscale nothing changes, and
 # link-compat passes, so 2P frames are untouched.
-189682ac080fe4f2 ce073aafdeac8985
+01bcf73b62ae9b31 ce073aafdeac8985
