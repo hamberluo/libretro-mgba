@@ -186,6 +186,24 @@ static void _retroAudioBuffStatusCallback(bool active, unsigned occupancy, bool 
 	retroAudioBuffUnderrun  = underrunLikely;
 }
 
+// The renderer sits out the next frame; emulation state is untouched.
+static void _skipRender(struct mCore* shown) {
+	switch (shown->platform(shown)) {
+#ifdef M_CORE_GBA
+	case mPLATFORM_GBA:
+		((struct GBA*) shown->board)->video.frameskipCounter = 1;
+		break;
+#endif
+#ifdef M_CORE_GB
+	case mPLATFORM_GB:
+		((struct GB*) shown->board)->video.frameskipCounter = 1;
+		break;
+#endif
+	default:
+		break;
+	}
+}
+
 static void _initFrameskip(void) {
 
 	if (frameskipType > 0) {
@@ -1694,21 +1712,7 @@ void retro_run(void) {
 
 		if (skipFrame) {
 			if(frameskipCounter < RETRO_FRAMESKIP_MAX) {
-
-				switch (shown->platform(shown)) {
-#ifdef M_CORE_GBA
-				case mPLATFORM_GBA:
-					((struct GBA*) shown->board)->video.frameskipCounter = 1;
-					break;
-#endif
-#ifdef M_CORE_GB
-				case mPLATFORM_GB:
-					((struct GB*) shown->board)->video.frameskipCounter = 1;
-					break;
-#endif
-				default:
-					break;
-				}
+				_skipRender(shown);
 				frameskipCounter++;
 
 			} else {
@@ -1718,6 +1722,14 @@ void retro_run(void) {
 		} else {
 			frameskipCounter = 0;
 		}
+	}
+
+	/* A frontend that will drop this frame (fast-forward shows only the last of
+	 * a batch) says so here; drawing it would be wasted work. */
+	int avEnable;
+	bool videoDisabled = environCallback(RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE, &avEnable) && !(avEnable & 1);
+	if (videoDisabled) {
+		_skipRender(shown);
 	}
 
    /* If frameskip settings have changed, update
@@ -1759,7 +1771,7 @@ void retro_run(void) {
 		}
 	}
 
-	if (!skipFrame) {
+	if (!skipFrame && !videoDisabled) {
 #if defined(COLOR_16_BIT) && defined(COLOR_5_6_5)
 		if (videoPostProcess) {
 			videoPostProcess(width, height);

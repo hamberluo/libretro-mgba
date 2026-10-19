@@ -26,3 +26,7 @@ bbe888dfa52ca3f2 ce073aafdeac8985
 # never reads; with the frontend's default Grayscale nothing changes, and
 # link-compat passes, so 2P frames are untouched.
 01bcf73b62ae9b31 ce073aafdeac8985
+# Render skip on GET_AUDIO_VIDEO_ENABLE: only gates renderer calls through
+# video.frameskipCounter, never emulation state; link-compat passes, so 2P
+# frames are untouched.
+d37af963146c0e87 ce073aafdeac8985
