@@ -195,9 +195,14 @@ static void _skipRender(struct mCore* shown) {
 		break;
 #endif
 #ifdef M_CORE_GB
-	case mPLATFORM_GB:
-		((struct GB*) shown->board)->video.frameskipCounter = 1;
+	case mPLATFORM_GB: {
+		struct GB* gb = shown->board;
+		// SGB VRAM transfers (PAL_TRN...) are read back from the drawn frame.
+		if (!(gb->model & GB_MODEL_SGB)) {
+			gb->video.frameskipCounter = 1;
+		}
 		break;
+	}
 #endif
 	default:
 		break;

@@ -30,3 +30,6 @@ bbe888dfa52ca3f2 ce073aafdeac8985
 # video.frameskipCounter, never emulation state; link-compat passes, so 2P
 # frames are untouched.
 d37af963146c0e87 ce073aafdeac8985
+# SGB carts opt out of the render skip: renderer-side SGB state only, never
+# emulation state; link-compat passes, so 2P frames are untouched.
+8b919849321933f6 ce073aafdeac8985
