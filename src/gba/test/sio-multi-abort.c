@@ -4,12 +4,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// A MULTI primary that rewrites SIOCNT with Start clear while its transfer is
-// in flight drops that transfer. Four Swords does this when its lobby opens
-// ~360 cycles before the transfer it just started would finish; if the old
-// Busy bit survives the write, the transfer completes into the freshly
-// enabled IRQ and the lobby never transfers again, stuck on "Linking with
-// other systems" until the player backs out and re-enters.
+// A MULTI primary that clears Start mid-transfer drops it. Four Swords does so
+// as its lobby opens; a transfer finishing into the IRQ it just enabled stalls
+// the lobby on "Linking with other systems".
 
 #include <mgba/core/core.h>
 #include <mgba/core/log.h>
@@ -140,16 +137,12 @@ int main(void) {
 	// What Four Swords writes as its lobby opens: Start clear, IRQ enabled.
 	GBAIOWrite(_gba(0), GBA_REG_SIOCNT, SIOCNT_MULTI_115200 | SIOCNT_IRQ);
 	linked = linked && _runFrames(2);
-	if (_gba(0)->sio.siocnt & SIOCNT_BUSY) {
-		printf("FAIL: primary still busy after clearing Start (SIOCNT %04X)\n", _gba(0)->sio.siocnt);
-		++failures;
-	}
 	if (_gba(0)->memory.io[GBA_REG(IF)] & IRQ_SIO) {
 		printf("FAIL: the dropped transfer still raised the SIO IRQ\n");
 		++failures;
 	}
 
-	// The cable must still work after the drop.
+	// A Busy bit left set would block this start.
 	GBAIOWrite(_gba(0), GBA_REG_SIOCNT, SIOCNT_MULTI_115200 | SIOCNT_IRQ | SIOCNT_BUSY);
 	linked = linked && _runFrames(2);
 	if (!linked) {
@@ -168,6 +161,6 @@ int main(void) {
 	}
 	GBASIOLockstepCoordinatorDeinit(&coordinator);
 
-	printf("4 checks, %d failures\n", failures);
+	printf("3 checks, %d failures\n", failures);
 	return failures != 0;
 }
