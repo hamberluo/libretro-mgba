@@ -177,6 +177,12 @@ void GBASIOWriteSIOCNT(struct GBASIO* sio, uint16_t value) {
 	switch (sio->mode) {
 	case GBA_SIO_MULTI:
 		value &= 0xFF83;
+		// Clearing Start mid-transfer drops it; otherwise the Busy bit kept
+		// below lets it finish into whatever IRQ setup the game just wrote.
+		if (!id && !GBASIOMultiplayerIsBusy(value) && GBASIOMultiplayerIsBusy(sio->siocnt)) {
+			mTimingDeschedule(&sio->p->timing, &sio->completeEvent);
+			sio->siocnt = GBASIOMultiplayerClearBusy(sio->siocnt);
+		}
 		value = GBASIOMultiplayerSetSlave(value, id || !connected);
 		value = GBASIOMultiplayerSetId(value, id);
 		value |= sio->siocnt & 0x00FC;

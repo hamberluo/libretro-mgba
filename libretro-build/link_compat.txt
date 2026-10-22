@@ -33,3 +33,7 @@ d37af963146c0e87 ce073aafdeac8985
 # SGB carts opt out of the render skip: renderer-side SGB state only, never
 # emulation state; link-compat passes, so 2P frames are untouched.
 8b919849321933f6 ce073aafdeac8985
+# No line for the MULTI transfer drop (sio-multi-abort, Four Swords late
+# joiners): link-compat passes only because its golden never clears Start
+# mid-transfer; 2P frames do change, so the id changes and both stores ship
+# together.
