@@ -37,3 +37,9 @@ d37af963146c0e87 ce073aafdeac8985
 # joiners): link-compat passes only because its golden never clears Start
 # mid-transfer; 2P frames do change, so the id changes and both stores ship
 # together.
+# Extended ROMs past 32 MiB (0x0A000000 reads on linearly): only ROMs over
+# 32 MiB take the new mapping, and link carts are retail games at or under
+# 32 MiB, whose bus reads are unchanged. GameShark/CodeBreaker hooks keep
+# 0x0A-0x0B addresses, but link cores never load cheats. link-compat passes,
+# so 2P frames are untouched.
+7fe4d21b0601e7fd 3b52706bfa2141f6

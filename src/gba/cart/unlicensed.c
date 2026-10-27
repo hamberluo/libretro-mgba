@@ -54,6 +54,9 @@ void GBAUnlCartDetect(struct GBA* gba) {
 			gba->memory.unl.multi.fullSize = gba->romVf->size(gba->romVf);
 			gba->memory.unl.multi.rom = gba->romVf->map(gba->romVf, gba->memory.unl.multi.fullSize, MAP_READ);
 			gba->memory.rom = gba->memory.unl.multi.rom;
+			// Banked through its own registers, not the extended linear bus.
+			gba->memory.romBusMask = GBA_SIZE_ROM0 - 1;
+			gba->memory.romMask = GBA_SIZE_ROM0 - 1;
 			gba->memory.hw.gpioBase = NULL;
 
 			gba->memory.unl.multi.settle.context = gba;
