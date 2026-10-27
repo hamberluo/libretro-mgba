@@ -63,11 +63,11 @@ int main(void) {
 	struct GBACheatSet* set = (struct GBACheatSet*) device->createSet(device, NULL);
 	GBACheatAddGameSharkRaw(set, 0xFA000100, 0x00000001);
 	expect("GameShark hook", set->hook->address, 0x0A000100);
-	set->d.deinit(&set->d);
+	mCheatSetDeinit(&set->d);
 	set = (struct GBACheatSet*) device->createSet(device, NULL);
 	GBACheatAddCodeBreaker(set, 0x1A000100, 0x0001);
 	expect("CodeBreaker hook", set->hook->address, 0x0A000100);
-	set->d.deinit(&set->d);
+	mCheatSetDeinit(&set->d);
 	unload(core);
 
 	// Not a power of two: padded out to the extended bus like a flash cart.
