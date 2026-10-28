@@ -945,6 +945,17 @@ static bool _GBACoreLoadExtraState(struct mCore* core, const struct mStateExtdat
 			ok = false;
 		}
 	}
+	size_t ewramHigh = (size_t) gba->memory.wramMask + 1 - GBA_SIZE_EWRAM;
+	if (ewramHigh) {
+		uint8_t* high = (uint8_t*) gba->memory.wram + GBA_SIZE_EWRAM;
+		// A state from before EWRAM was extended has nothing here.
+		if (mStateExtdataGet(extdata, EXTDATA_SUBSYSTEM_START + GBA_SUBSYSTEM_EWRAM_EXTENDED, &item) &&
+		    (size_t) item.size == ewramHigh) {
+			memcpy(high, item.data, ewramHigh);
+		} else {
+			memset(high, 0, ewramHigh);
+		}
+	}
 	return ok;
 }
 
@@ -986,6 +997,16 @@ static bool _GBACoreSaveExtraState(struct mCore* core, struct mStateExtdata* ext
 			buffer = NULL;
 		}
 		size = 0;
+	}
+
+	size = (size_t) gba->memory.wramMask + 1 - GBA_SIZE_EWRAM;
+	if (size) {
+		struct mStateExtdataItem item;
+		item.size = size;
+		item.data = malloc(size);
+		item.clean = free;
+		memcpy(item.data, (uint8_t*) gba->memory.wram + GBA_SIZE_EWRAM, size);
+		mStateExtdataPut(extdata, EXTDATA_SUBSYSTEM_START + GBA_SUBSYSTEM_EWRAM_EXTENDED, &item);
 	}
 
 	return true;

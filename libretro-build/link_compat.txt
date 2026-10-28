@@ -43,3 +43,7 @@ d37af963146c0e87 ce073aafdeac8985
 # 0x0A-0x0B addresses, but link cores never load cheats. link-compat passes,
 # so 2P frames are untouched.
 7fe4d21b0601e7fd 3b52706bfa2141f6
+# Extended EWRAM (512 KiB, no mirror) for the same ROMs over 32 MiB: link
+# carts are retail games at or under 32 MiB, whose EWRAM still mirrors at
+# 256 KiB. link-compat passes, so 2P frames are untouched.
+4319b1b46d249d0a 3b52706bfa2141f6

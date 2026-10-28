@@ -8,9 +8,11 @@
 // bus. Ordinary ROMs must keep mirroring there, a ROM patch (cheat) on an
 // extended ROM must copy the whole image, not the first 32 MiB, and a cheat
 // hook there must keep its address, since it fires on an exact PC match.
+// Their EWRAM past 256 KiB must not mirror, and must survive a savestate.
 
 #include <mgba/core/cheats.h>
 #include <mgba/core/core.h>
+#include <mgba/core/serialize.h>
 #include <mgba/gba/core.h>
 #include <mgba/internal/gba/cheats.h>
 #include <mgba/internal/gba/gba.h>
@@ -68,6 +70,16 @@ int main(void) {
 	GBACheatAddCodeBreaker(set, 0x1A000100, 0x0001);
 	expect("CodeBreaker hook", set->hook->address, 0x0A000100);
 	mCheatSetDeinit(&set->d);
+	core->busWrite32(core, 0x02000000, 0x44444444);
+	core->busWrite32(core, 0x02040000, 0x55555555);
+	expect("64M EWRAM low", core->busRead32(core, 0x02000000), 0x44444444);
+	struct VFile* state = VFileMemChunk(NULL, 0);
+	mCoreSaveStateNamed(core, state, 0);
+	core->busWrite32(core, 0x02040000, 0);
+	state->seek(state, 0, SEEK_SET);
+	mCoreLoadStateNamed(core, state, 0);
+	state->close(state);
+	expect("64M EWRAM high state", core->busRead32(core, 0x02040000), 0x55555555);
 	unload(core);
 
 	// Not a power of two: padded out to the extended bus like a flash cart.
@@ -77,15 +89,19 @@ int main(void) {
 
 	core = load(rom, GBA_SIZE_ROM0);
 	expect("32M ROM1 mirror", core->busRead32(core, 0x0A000000), 0x11111111);
+	core->busWrite32(core, 0x02040000, 0x55555555);
+	expect("32M EWRAM mirror", core->busRead32(core, 0x02000000), 0x55555555);
 	unload(core);
 
 	// Bootleg multicarts are this big too, but bank through their own registers.
 	memcpy(&rom[0xAC], "AXVJ01", 6);
 	core = load(rom, GBA_SIZE_ROM_EXTENDED);
 	expect("multicart ROM1 mirror", core->busRead32(core, 0x0A000000), 0x11111111);
+	core->busWrite32(core, 0x02040000, 0x55555555);
+	expect("multicart EWRAM mirror", core->busRead32(core, 0x02000000), 0x55555555);
 	unload(core);
 
 	free(rom);
-	printf("13 checks, %d failures\n", failures);
+	printf("17 checks, %d failures\n", failures);
 	return failures != 0;
 }

@@ -59,6 +59,8 @@ enum GBAMemoryBase {
 enum {
 	GBA_SIZE_BIOS = 0x00004000,
 	GBA_SIZE_EWRAM = 0x00040000,
+	// Such romhacks also keep data past 256 KiB of EWRAM, expecting no mirror.
+	GBA_SIZE_EWRAM_EXTENDED = 0x00080000,
 	GBA_SIZE_IWRAM = 0x00008000,
 	GBA_SIZE_IO = 0x00000400,
 	GBA_SIZE_PALETTE_RAM = 0x00000400,
@@ -116,6 +118,7 @@ struct GBAMemory {
 	size_t romSize;
 	uint32_t romMask;
 	uint32_t romBusMask;
+	uint32_t wramMask;
 	uint16_t romID;
 	int fullBios;
 

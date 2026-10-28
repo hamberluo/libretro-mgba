@@ -56,6 +56,7 @@ void GBAUnlCartDetect(struct GBA* gba) {
 			gba->memory.rom = gba->memory.unl.multi.rom;
 			// Banked through its own registers, not the extended linear bus.
 			gba->memory.romBusMask = GBA_SIZE_ROM0 - 1;
+			gba->memory.wramMask = GBA_SIZE_EWRAM - 1;
 			gba->memory.romMask = GBA_SIZE_ROM0 - 1;
 			gba->memory.hw.gpioBase = NULL;
 
