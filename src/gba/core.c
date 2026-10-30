@@ -1236,7 +1236,7 @@ void* _GBACoreGetMemoryBlock(struct mCore* core, size_t id, size_t* sizeOut) {
 		return gba->memory.rom;
 	case GBA_REGION_SRAM:
 		if (gba->memory.savedata.type == GBA_SAVEDATA_FLASH1M) {
-			*sizeOut = GBA_SIZE_FLASH1M;
+			*sizeOut = GBASavedataSize(&gba->memory.savedata) - (gba->memory.savedata.currentBank - gba->memory.savedata.data);
 			return gba->memory.savedata.currentBank;
 		}
 		// Fall through

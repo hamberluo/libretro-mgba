@@ -112,6 +112,9 @@ int main(void) {
 	flashCommand(core, 0xA0);
 	core->busWrite8(core, 0x0E000000, 0x66);
 	expect("64M flash bank 7", savedata->data[0x70000], 0x66);
+	size_t blockSize;
+	core->getMemoryBlock(core, GBA_REGION_SRAM, &blockSize);
+	expect("64M flash block past bank 7", blockSize, 0x10000);
 	state = VFileMemChunk(NULL, 0);
 	mCoreSaveStateNamed(core, state, 0);
 	flashCommand(core, 0xB0);
@@ -147,6 +150,6 @@ int main(void) {
 	unload(core);
 
 	free(rom);
-	printf("25 checks, %d failures\n", failures);
+	printf("26 checks, %d failures\n", failures);
 	return failures != 0;
 }

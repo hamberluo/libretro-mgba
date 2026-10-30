@@ -52,3 +52,6 @@ d37af963146c0e87 ce073aafdeac8985
 # retail games at or under 32 MiB, whose flash and saves are unchanged.
 # link-compat passes, so 2P frames are untouched.
 087ea04e77da7da8 3b52706bfa2141f6
+# Flash memory block size counts from the current bank: debugger/scripting
+# view only, never read by emulation or link. link-compat passes.
+d795413520e930fb 3b52706bfa2141f6
