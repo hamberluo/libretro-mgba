@@ -1327,7 +1327,7 @@ static void _doDeferredSetup(void) {
 	// you actually first get them, you're out of luck without workarounds. Yup, seriously.
 	// Here's that workaround, but really the API needs to be thrown out and rewritten.
 	/* savedataSize was sized in retro_load_game to the buffer actually allocated:
-	 * GBA_SIZE_FLASH1M for GBA (its flash autodetect keys off this VFile size)
+	 * the largest flash size for GBA (its flash autodetect keys off this VFile size)
 	 * and sramSize (+RTC suffix) for GB, which is large enough for GBResizeSram()
 	 * to map in-bounds -- including MBC6's concatenated 1MB flash -- instead of
 	 * growing the fixed buffer and running memset() off the end. */
@@ -2164,14 +2164,19 @@ bool retro_load_game(const struct retro_game_info* game) {
 	 * rather than always reserving the MBC6 worst case (SRAM + 1MB flash =
 	 * 1.1MB). loadROM has finalized sramSize by now and it never grows past this
 	 * point (GBMBCInit derives it from the ROM header), so this is the lifetime
-	 * maximum. GBA stays at GBA_SIZE_FLASH1M: its type may still be AUTODETECT
-	 * here and that is the largest GBA save anyway. The buffer must already fit
+	 * maximum. GBA takes its largest flash size: its type may still be
+	 * AUTODETECT here, and flash is the largest GBA save. The buffer must already fit
 	 * before retro_load_game returns -- the frontend writes up to
 	 * retro_get_memory_size() bytes into it before the first retro_run().
 	 * Note: MBC6 ends up with savedataSize == sramSize exactly, which depends on
 	 * VFileFromMemory's map() accepting size == bufferSize (see _vfmMap in
 	 * src/util/vfs/vfs-mem.c); do not shrink that buffer below sramSize. */
 	savedataSize = GBA_SIZE_FLASH1M;
+#ifdef M_CORE_GBA
+	if (core->platform(core) == mPLATFORM_GBA) {
+		savedataSize = GBASavedataFlash1MSize(&((struct GBA*) core->board)->memory.savedata);
+	}
+#endif
 #ifdef M_CORE_GB
 	if (core->platform(core) == mPLATFORM_GB) {
 		size_t needed = ((struct GB*) core->board)->sramSize + _GBSaveRTCSuffixSize(core);
@@ -2510,7 +2515,7 @@ static size_t _saveRamSize(struct mCore* c) {
 	case mPLATFORM_GBA:
 		switch (((struct GBA*) c->board)->memory.savedata.type) {
 		case GBA_SAVEDATA_AUTODETECT:
-			return GBA_SIZE_FLASH1M;
+			return savedataSize;
 		default:
 			return GBASavedataSize(&((struct GBA*) c->board)->memory.savedata);
 		}

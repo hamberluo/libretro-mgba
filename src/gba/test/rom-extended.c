@@ -9,6 +9,8 @@
 // extended ROM must copy the whole image, not the first 32 MiB, and a cheat
 // hook there must keep its address, since it fires on an exact PC match.
 // Their EWRAM past 256 KiB must not mirror, and must survive a savestate.
+// A made-up 512 KiB flash part in their chip table must answer its ID and
+// keep banks past 1 across a savestate; without one, flash stays 128 KiB.
 
 #include <mgba/core/cheats.h>
 #include <mgba/core/core.h>
@@ -39,6 +41,17 @@ static struct mCore* load(uint8_t* rom, size_t size) {
 	core->loadROM(core, VFileFromConstMemory(rom, size));
 	core->reset(core);
 	return core;
+}
+
+static void flashCommand(struct mCore* core, uint8_t command) {
+	core->busWrite8(core, 0x0E005555, 0xAA);
+	core->busWrite8(core, 0x0E002AAA, 0x55);
+	core->busWrite8(core, 0x0E005555, command);
+}
+
+static uint32_t flashBank(struct mCore* core) {
+	struct GBASavedata* savedata = &((struct GBA*) core->board)->memory.savedata;
+	return (savedata->currentBank - savedata->data) >> 16;
 }
 
 static void unload(struct mCore* core) {
@@ -80,6 +93,33 @@ int main(void) {
 	mCoreLoadStateNamed(core, state, 0);
 	state->close(state);
 	expect("64M EWRAM high state", core->busRead32(core, 0x02040000), 0x55555555);
+	struct GBASavedata* savedata = &((struct GBA*) core->board)->memory.savedata;
+	GBASavedataForceType(savedata, GBA_SAVEDATA_FLASH1M);
+	expect("64M plain flash size", GBASavedataSize(savedata), 0x20000);
+	unload(core);
+
+	// agb_flash FlashType: romSize, sector size/shift/count/top, wait, ID.
+	memcpy(&rom[0x100000], "\x00\x00\x08\x00\x00\x10\x00\x00\x0C\x00\x80\x00\x00\x00\x00\x00\x03\x00\x01\x00\x47\x53", 22);
+	core = load(rom, GBA_SIZE_ROM_EXTENDED);
+	savedata = &((struct GBA*) core->board)->memory.savedata;
+	GBASavedataForceType(savedata, GBA_SAVEDATA_FLASH1M);
+	expect("64M flash size", GBASavedataSize(savedata), 0x80000);
+	flashCommand(core, 0x90);
+	expect("64M flash ID", core->busRead8(core, 0x0E000000) | core->busRead8(core, 0x0E000001) << 8, 0x5347);
+	flashCommand(core, 0xF0);
+	flashCommand(core, 0xB0);
+	core->busWrite8(core, 0x0E000000, 7);
+	flashCommand(core, 0xA0);
+	core->busWrite8(core, 0x0E000000, 0x66);
+	expect("64M flash bank 7", savedata->data[0x70000], 0x66);
+	state = VFileMemChunk(NULL, 0);
+	mCoreSaveStateNamed(core, state, 0);
+	flashCommand(core, 0xB0);
+	core->busWrite8(core, 0x0E000000, 0);
+	state->seek(state, 0, SEEK_SET);
+	mCoreLoadStateNamed(core, state, 0);
+	state->close(state);
+	expect("64M flash bank state", flashBank(core), 7);
 	unload(core);
 
 	// Not a power of two: padded out to the extended bus like a flash cart.
@@ -91,6 +131,11 @@ int main(void) {
 	expect("32M ROM1 mirror", core->busRead32(core, 0x0A000000), 0x11111111);
 	core->busWrite32(core, 0x02040000, 0x55555555);
 	expect("32M EWRAM mirror", core->busRead32(core, 0x02000000), 0x55555555);
+	GBASavedataForceType(&((struct GBA*) core->board)->memory.savedata, GBA_SAVEDATA_FLASH1M);
+	expect("32M flash size", GBASavedataSize(&((struct GBA*) core->board)->memory.savedata), 0x20000);
+	flashCommand(core, 0xB0);
+	core->busWrite8(core, 0x0E000000, 7);
+	expect("32M flash bank 7 refused", flashBank(core), 0);
 	unload(core);
 
 	// Bootleg multicarts are this big too, but bank through their own registers.
@@ -102,6 +147,6 @@ int main(void) {
 	unload(core);
 
 	free(rom);
-	printf("17 checks, %d failures\n", failures);
+	printf("25 checks, %d failures\n", failures);
 	return failures != 0;
 }

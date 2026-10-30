@@ -172,6 +172,8 @@ void GBAUnloadROM(struct GBA* gba) {
 	}
 	GBASavedataUnmask(&gba->memory.savedata);
 	GBASavedataDeinit(&gba->memory.savedata);
+	// Flash size follows this, so the savedata must go first.
+	gba->memory.extendedFlashId = 0;
 	if (gba->memory.savedata.realVf) {
 		gba->memory.savedata.realVf->close(gba->memory.savedata.realVf);
 		gba->memory.savedata.realVf = 0;
@@ -496,6 +498,9 @@ bool GBALoadROM(struct GBA* gba, struct VFile* vf) {
 	}
 	GBAHardwareInit(&gba->memory.hw, &((uint16_t*) gba->memory.rom)[GPIO_REG_DATA >> 1]);
 	GBAUnlCartDetect(gba);
+	if (gba->memory.romBusMask >= GBA_SIZE_ROM0) {
+		gba->memory.extendedFlashId = GBASavedataFindExtendedFlash(gba->memory.rom, gba->memory.romSize);
+	}
 	// TODO: error check
 	return true;
 }

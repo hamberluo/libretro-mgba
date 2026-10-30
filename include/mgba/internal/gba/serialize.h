@@ -316,6 +316,7 @@ DECL_BITFIELD(GBASerializedSavedataFlags, uint8_t);
 DECL_BITS(GBASerializedSavedataFlags, FlashState, 0, 2);
 DECL_BIT(GBASerializedSavedataFlags, FlashBank, 4);
 DECL_BIT(GBASerializedSavedataFlags, DustSettling, 5);
+DECL_BITS(GBASerializedSavedataFlags, FlashBankHigh, 6, 2);
 
 DECL_BITFIELD(GBASerializedMiscFlags, uint32_t);
 DECL_BIT(GBASerializedMiscFlags, Halted, 0);

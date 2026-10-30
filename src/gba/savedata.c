@@ -87,7 +87,7 @@ void GBASavedataDeinit(struct GBASavedata* savedata) {
 			mappedMemoryFree(savedata->data, GBA_SIZE_FLASH512);
 			break;
 		case GBA_SAVEDATA_FLASH1M:
-			mappedMemoryFree(savedata->data, GBA_SIZE_FLASH1M);
+			mappedMemoryFree(savedata->data, GBASavedataFlash1MSize(savedata));
 			break;
 		case GBA_SAVEDATA_EEPROM:
 			mappedMemoryFree(savedata->data, GBA_SIZE_EEPROM);
@@ -143,8 +143,10 @@ bool GBASavedataClone(struct GBASavedata* savedata, struct VFile* out) {
 			return out->write(out, savedata->data, GBA_SIZE_SRAM512) == GBA_SIZE_SRAM512;
 		case GBA_SAVEDATA_FLASH512:
 			return out->write(out, savedata->data, GBA_SIZE_FLASH512) == GBA_SIZE_FLASH512;
-		case GBA_SAVEDATA_FLASH1M:
-			return out->write(out, savedata->data, GBA_SIZE_FLASH1M) == GBA_SIZE_FLASH1M;
+		case GBA_SAVEDATA_FLASH1M: {
+			size_t size = GBASavedataFlash1MSize(savedata);
+			return out->write(out, savedata->data, size) == (ssize_t) size;
+		}
 		case GBA_SAVEDATA_EEPROM:
 			return out->write(out, savedata->data, GBA_SIZE_EEPROM) == GBA_SIZE_EEPROM;
 		case GBA_SAVEDATA_EEPROM512:
@@ -175,7 +177,7 @@ size_t GBASavedataSize(const struct GBASavedata* savedata) {
 	case GBA_SAVEDATA_FLASH512:
 		return GBA_SIZE_FLASH512;
 	case GBA_SAVEDATA_FLASH1M:
-		return GBA_SIZE_FLASH1M;
+		return GBASavedataFlash1MSize(savedata);
 	case GBA_SAVEDATA_EEPROM:
 		return GBA_SIZE_EEPROM;
 	case GBA_SAVEDATA_EEPROM512:
@@ -189,6 +191,37 @@ size_t GBASavedataSize(const struct GBASavedata* savedata) {
 		}
 		return 0;
 	}
+}
+
+size_t GBASavedataFlash1MSize(const struct GBASavedata* savedata) {
+	if (savedata->p->memory.extendedFlashId) {
+		return GBA_SIZE_FLASH_EXTENDED;
+	}
+	return GBA_SIZE_FLASH1M;
+}
+
+// Some emulator-only romhacks add a made-up 512 KiB part to agb_flash's chip
+// table and use the space past 128 KiB only when the chip answers its ID.
+uint16_t GBASavedataFindExtendedFlash(const void* rom, size_t size) {
+	const uint8_t* bytes = rom;
+	size_t i;
+	for (i = 0; i + 24 <= size; i += 4) {
+		uint32_t value;
+		LOAD_32LE(value, i, bytes);
+		if (value != GBA_SIZE_FLASH_EXTENDED) {
+			continue;
+		}
+		uint16_t count;
+		LOAD_32LE(value, i + 4, bytes);
+		LOAD_16LE(count, i + 10, bytes);
+		if (value != 0x1000 || bytes[i + 8] != 12 || count != GBA_SIZE_FLASH_EXTENDED >> 12) {
+			continue;
+		}
+		uint16_t id;
+		LOAD_16LE(id, i + 20, bytes);
+		return id;
+	}
+	return 0;
 }
 
 bool GBASavedataLoad(struct GBASavedata* savedata, struct VFile* in) {
@@ -274,12 +307,12 @@ void GBASavedataInitFlash(struct GBASavedata* savedata) {
 	}
 	int32_t flashSize = GBA_SIZE_FLASH512;
 	if (savedata->type == GBA_SAVEDATA_FLASH1M) {
-		flashSize = GBA_SIZE_FLASH1M;
+		flashSize = GBASavedataFlash1MSize(savedata);
 	}
 	off_t end;
 	if (!savedata->vf) {
 		end = 0;
-		savedata->data = anonymousMemoryMap(GBA_SIZE_FLASH1M);
+		savedata->data = anonymousMemoryMap(GBASavedataFlash1MSize(savedata));
 	} else {
 		end = savedata->vf->size(savedata->vf);
 		if (end < flashSize) {
@@ -382,7 +415,8 @@ uint8_t GBASavedataReadFlash(struct GBASavedata* savedata, uint16_t address) {
 			}
 		} else if (savedata->type == GBA_SAVEDATA_FLASH1M) {
 			if (address < 2) {
-				return FLASH_SANYO_LE26FV10N1TS >> (address * 8);
+				uint16_t id = savedata->p->memory.extendedFlashId;
+				return (id ? id : FLASH_SANYO_LE26FV10N1TS) >> (address * 8);
 			}
 		}
 	}
@@ -407,7 +441,7 @@ void GBASavedataWriteFlash(struct GBASavedata* savedata, uint16_t address, uint8
 			mTimingSchedule(&savedata->p->timing, &savedata->dust, FLASH_PROGRAM_CYCLES);
 			break;
 		case FLASH_COMMAND_SWITCH_BANK:
-			if (address == 0 && value < 2) {
+			if (address == 0 && value < GBASavedataFlash1MSize(savedata) >> 16) {
 				_flashSwitchBank(savedata, value);
 			} else {
 				mLOG(GBA_SAVE, GAME_ERROR, "Bad flash bank switch");
@@ -621,7 +655,7 @@ void GBASavedataRTCWrite(struct GBASavedata* savedata) {
 	if ((savedata->vf->size(savedata->vf) & 0xFF) != sizeof(buffer)) {
 		// Writing past the end of the file can invalidate the file mapping
 		if (savedata->type == GBA_SAVEDATA_FLASH1M) {
-			bank = savedata->currentBank == &savedata->data[0x10000];
+			bank = (savedata->currentBank - savedata->data) >> 16;
 		}
 		savedata->vf->unmap(savedata->vf, savedata->data, size);
 		savedata->data = NULL;
@@ -717,7 +751,9 @@ void GBASavedataSerialize(const struct GBASavedata* savedata, struct GBASerializ
 	state->savedata.command = savedata->command;
 	GBASerializedSavedataFlags flags = 0;
 	flags = GBASerializedSavedataFlagsSetFlashState(flags, savedata->flashState);
-	flags = GBASerializedSavedataFlagsTestFillFlashBank(flags, savedata->currentBank == &savedata->data[0x10000]);
+	int bank = (savedata->currentBank - savedata->data) >> 16;
+	flags = GBASerializedSavedataFlagsTestFillFlashBank(flags, bank & 1);
+	flags = GBASerializedSavedataFlagsSetFlashBankHigh(flags, bank >> 1);
 
 	if (mTimingIsScheduled(&savedata->p->timing, &savedata->dust)) {
 		STORE_32(savedata->dust.when - mTimingCurrentTime(&savedata->p->timing), 0, &state->savedata.settlingDust);
@@ -746,7 +782,7 @@ void GBASavedataDeserialize(struct GBASavedata* savedata, const struct GBASerial
 	LOAD_16(savedata->settling, 0, &state->savedata.settlingSector);
 
 	if (savedata->type == GBA_SAVEDATA_FLASH1M) {
-		_flashSwitchBank(savedata, GBASerializedSavedataFlagsGetFlashBank(flags));
+		_flashSwitchBank(savedata, GBASerializedSavedataFlagsGetFlashBank(flags) | (GBASerializedSavedataFlagsGetFlashBankHigh(flags) << 1));
 	}
 
 	if (GBASerializedSavedataFlagsIsDustSettling(flags)) {
@@ -762,13 +798,14 @@ void _flashSwitchBank(struct GBASavedata* savedata, int bank) {
 		mLOG(GBA_SAVE, INFO, "Updating flash chip from 512kb to 1Mb");
 		savedata->type = GBA_SAVEDATA_FLASH1M;
 		if (savedata->vf) {
+			size_t size = GBASavedataFlash1MSize(savedata);
 			savedata->vf->unmap(savedata->vf, savedata->data, GBA_SIZE_FLASH512);
-			if (savedata->vf->size(savedata->vf) < GBA_SIZE_FLASH1M) {
-				savedata->vf->truncate(savedata->vf, GBA_SIZE_FLASH1M);
-				savedata->data = savedata->vf->map(savedata->vf, GBA_SIZE_FLASH1M, MAP_WRITE);
-				memset(&savedata->data[GBA_SIZE_FLASH512], 0xFF, GBA_SIZE_FLASH512);
+			if (savedata->vf->size(savedata->vf) < (ssize_t) size) {
+				savedata->vf->truncate(savedata->vf, size);
+				savedata->data = savedata->vf->map(savedata->vf, size, MAP_WRITE);
+				memset(&savedata->data[GBA_SIZE_FLASH512], 0xFF, size - GBA_SIZE_FLASH512);
 			} else {
-				savedata->data = savedata->vf->map(savedata->vf, GBA_SIZE_FLASH1M, MAP_WRITE);
+				savedata->data = savedata->vf->map(savedata->vf, size, MAP_WRITE);
 			}
 		}
 		mCALLBACKS_INVOKE(savedata->p, memoryBlocksChanged);
@@ -781,7 +818,7 @@ void _flashErase(struct GBASavedata* savedata) {
 	savedata->dirty |= mSAVEDATA_DIRT_NEW;
 	size_t size = GBA_SIZE_FLASH512;
 	if (savedata->type == GBA_SAVEDATA_FLASH1M) {
-		size = GBA_SIZE_FLASH1M;
+		size = GBASavedataFlash1MSize(savedata);
 	}
 	memset(savedata->data, 0xFF, size);
 }

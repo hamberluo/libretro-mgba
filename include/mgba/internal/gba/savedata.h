@@ -100,6 +100,8 @@ void GBASavedataDeinit(struct GBASavedata* savedata);
 void GBASavedataMask(struct GBASavedata* savedata, struct VFile* vf, bool writeback);
 void GBASavedataUnmask(struct GBASavedata* savedata);
 size_t GBASavedataSize(const struct GBASavedata* savedata);
+size_t GBASavedataFlash1MSize(const struct GBASavedata* savedata);
+uint16_t GBASavedataFindExtendedFlash(const void* rom, size_t size);
 bool GBASavedataClone(struct GBASavedata* savedata, struct VFile* out);
 bool GBASavedataLoad(struct GBASavedata* savedata, struct VFile* in);
 void GBASavedataForceType(struct GBASavedata* savedata, enum GBASavedataType type);

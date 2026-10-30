@@ -75,6 +75,7 @@ enum {
 	GBA_SIZE_SRAM512 = 0x00010000,
 	GBA_SIZE_FLASH512 = 0x00010000,
 	GBA_SIZE_FLASH1M = 0x00020000,
+	GBA_SIZE_FLASH_EXTENDED = 0x00080000,
 	GBA_SIZE_EEPROM = 0x00002000,
 	GBA_SIZE_EEPROM512 = 0x00000200,
 
@@ -119,6 +120,7 @@ struct GBAMemory {
 	uint32_t romMask;
 	uint32_t romBusMask;
 	uint32_t wramMask;
+	uint16_t extendedFlashId;
 	uint16_t romID;
 	int fullBios;
 

@@ -47,3 +47,8 @@ d37af963146c0e87 ce073aafdeac8985
 # carts are retail games at or under 32 MiB, whose EWRAM still mirrors at
 # 256 KiB. link-compat passes, so 2P frames are untouched.
 4319b1b46d249d0a 3b52706bfa2141f6
+# 512 KiB flash for ROMs over 32 MiB that list a made-up 512 KiB chip in
+# agb_flash's table (chip ID, banks 2-7, savestate bank bits): link carts are
+# retail games at or under 32 MiB, whose flash and saves are unchanged.
+# link-compat passes, so 2P frames are untouched.
+087ea04e77da7da8 3b52706bfa2141f6

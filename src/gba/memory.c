@@ -59,6 +59,7 @@ void GBAMemoryInit(struct GBA* gba) {
 	gba->memory.romSize = 0;
 	gba->memory.romMask = 0;
 	gba->memory.romBusMask = GBA_SIZE_ROM0 - 1;
+	gba->memory.extendedFlashId = 0;
 	gba->memory.hw.p = gba;
 
 	int i;
