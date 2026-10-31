@@ -5,6 +5,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include "link.h"
 
+#include "aux-core.h"
+
 #include <mgba/core/config.h>
 #include <mgba/core/interface.h>
 #include <mgba/core/lockstep.h>
@@ -243,40 +245,6 @@ static void _gbUnload(struct mLockstep* lockstep, int id) {
 }
 #endif
 
-// Anything that changes emulated results is pinned here instead of read from
-// the frontend, so both ends agree whatever their settings say.
-static void _configure(struct mCore* core) {
-	struct mCoreOptions opts = {
-		.useBios = false,
-		.skipBios = true,
-		.volume = 0x100,
-	};
-	mCoreConfigSetDefaultValue(&core->config, "idleOptimization", "remove");
-	mCoreConfigSetDefaultIntValue(&core->config, "allowOpposingDirections", 0);
-	mCoreConfigSetDefaultIntValue(&core->config, "sgb.borders", 0);
-	mCoreConfigLoadDefaults(&core->config, &opts);
-	mCoreLoadConfig(core);
-}
-
-static void _neverDraw(struct RetroLinkPlayer* player) {
-	switch (player->link->platform) {
-#ifdef M_CORE_GBA
-	case mPLATFORM_GBA:
-		((struct GBA*) player->core->board)->video.frameskip = INT_MAX;
-		((struct GBA*) player->core->board)->video.frameskipCounter = INT_MAX;
-		break;
-#endif
-#ifdef M_CORE_GB
-	case mPLATFORM_GB:
-		((struct GB*) player->core->board)->video.frameskip = INT_MAX;
-		((struct GB*) player->core->board)->video.frameskipCounter = INT_MAX;
-		break;
-#endif
-	default:
-		break;
-	}
-}
-
 static void _drawAgain(struct RetroLinkPlayer* player) {
 	struct mCore* core = player->core;
 	switch (player->link->platform) {
@@ -298,11 +266,8 @@ static void _drawAgain(struct RetroLinkPlayer* player) {
 }
 
 static void _destroyPlayer(struct RetroLinkPlayer* player) {
-	if (player->core) {
-		mCoreConfigDeinit(&player->core->config);
-		player->core->deinit(player->core);
-		player->core = NULL;
-	}
+	RetroAuxCoreDestroy(player->core);
+	player->core = NULL;
 	free(player->scratchVideo);
 	player->scratchVideo = NULL;
 }
@@ -383,7 +348,7 @@ struct RetroLink* RetroLinkCreate(enum mPlatform platform, const struct RetroLin
 		}
 		mCoreInitConfig(player->core, NULL);
 		player->core->init(player->core);
-		_configure(player->core);
+		RetroAuxCoreConfigure(player->core);
 		struct VFile* rom = carts[i].rom ? VFileFromConstMemory(carts[i].rom, carts[i].romSize) : NULL;
 		if (!rom) {
 			goto fail;
@@ -415,7 +380,7 @@ struct RetroLink* RetroLinkCreate(enum mPlatform platform, const struct RetroLin
 			save->close(save);
 		}
 		if (i != localPlayer) {
-			_neverDraw(player);
+			RetroAuxCoreNeverDraw(player->core);
 		}
 		player->frameTicks = (int32_t) ((int64_t) player->core->frameCycles(player->core)
 		                                * player->core->timingFrequency(player->core)
@@ -458,7 +423,7 @@ bool RetroLinkSetView(struct RetroLink* link, unsigned player) {
 		from->scratchVideo = calloc(256 * 224, sizeof(mColor));
 	}
 	from->core->setVideoBuffer(from->core, from->scratchVideo, 256);
-	_neverDraw(from);
+	RetroAuxCoreNeverDraw(from->core);
 	to->core->setVideoBuffer(to->core, link->localVideo, link->localStride);
 	_drawAgain(to);
 	link->viewedPlayer = player;
