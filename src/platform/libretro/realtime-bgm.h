@@ -24,6 +24,13 @@ struct RealtimeBgmM4a {
 // so agbcc, gcc and C-written drivers all resolve.
 enum retro_bgm_status RealtimeBgmLocate(const uint8_t* rom, size_t romSize, struct RealtimeBgmM4a* out);
 
+typedef uint8_t (*RealtimeBgmRead8)(void* ctx, uint32_t address);
+
+// m4a has no music flag; a song loops, and so is music, when any track jumps
+// back (GOTO) before its first FINE. Pointer arguments are skipped so their
+// bytes are never read as commands.
+bool RealtimeBgmSongLoops(RealtimeBgmRead8 read8, void* ctx, uint32_t songHeader);
+
 CXX_GUARD_END
 
 #endif
