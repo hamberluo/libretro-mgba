@@ -176,6 +176,26 @@ static void handback_waits_for_effects_tempo(void) {
 	RetroAuxCoreDestroy(core);
 }
 
+// Cloned while main was inside a driver call (a lag frame): the driver's
+// locks read ID+1, and no code on a shadow would ever release them, leaving
+// SoundMain and MPlayStart returning early for the whole press.
+static void clone_releases_driver_locks(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgm* bgm = create(core, bgmStubs());
+	soundInit(core);
+	core->busWrite32(core, BGM_SOUND_INFO, BGM_ID + 1);
+	core->busWrite32(core, BGM_PLAYER + 0x34, BGM_ID + 1);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	CHECK(RealtimeBgmActive(bgm));
+	for (int sfx = 0; sfx < 2; ++sfx) {
+		struct mCore* shadow = RealtimeBgmShadowForTesting(bgm, sfx);
+		CHECK(shadow->busRead32(shadow, BGM_SOUND_INFO) == BGM_ID);
+		CHECK(shadow->busRead32(shadow, BGM_PLAYER + 0x34) == BGM_ID);
+	}
+	RealtimeBgmDestroy(bgm);
+	RetroAuxCoreDestroy(core);
+}
+
 // Unloading mid hand-back frees both shadows (ASan reports a leak or a UAF).
 static void destroy_mid_handback(void) {
 	struct mCore* core = mainCore();
@@ -201,6 +221,7 @@ int main(void) {
 	handback_reuses_shadow();
 	handback_waits_for_main_tempo();
 	handback_waits_for_effects_tempo();
+	clone_releases_driver_locks();
 	destroy_mid_handback();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-shadow: %d failure(s)\n", failures);

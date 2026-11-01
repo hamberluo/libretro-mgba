@@ -403,9 +403,27 @@ static bool readChain(struct RealtimeBgm* b) {
 	return b->playerCount > 0;
 }
 
+// A clone can land while main is inside a driver call (a lag frame), with its
+// locks reading ID+1. No game code runs on a shadow to release them, and the
+// driver returns early on a held lock, so restore what the call writes on exit.
+static void releaseDriverLocks(struct RealtimeBgm* b, struct Shadow* s) {
+	struct ARMCore* cpu = s->gba->cpu;
+	uint32_t si = bus32(s->gba, SOUND_INFO_PTR);
+	if (bus32(s->gba, si) == M4A_ID + 1) {
+		cpu->memory.store32(cpu, si, M4A_ID, NULL);
+	}
+	for (int p = 0; p < b->playerCount; ++p) {
+		if (bus32(s->gba, b->players[p] + MP_IDENT) == M4A_ID + 1) {
+			cpu->memory.store32(cpu, b->players[p] + MP_IDENT, M4A_ID, NULL);
+		}
+	}
+}
+
 static void cloneShadows(struct RealtimeBgm* b) {
 	shadowClone(b, &b->bgm);
 	shadowClone(b, &b->sfx);
+	releaseDriverLocks(b, &b->bgm);
+	releaseDriverLocks(b, &b->sfx);
 	mAudioBufferClear(&b->bgmOut);
 	++clones;
 }

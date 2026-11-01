@@ -60,3 +60,5 @@ d795413520e930fb 3b52706bfa2141f6
 # retro_link_begin; link.c's aux core helpers moved verbatim to aux-core.c.
 # link-compat passes, so 2P frames are untouched.
 8198dc58cd0be529 3b52706bfa2141f6
+# Driver locks restored on shadows after a clone: shadow-only, as above.
+83a02ea85b381ba9 3b52706bfa2141f6
