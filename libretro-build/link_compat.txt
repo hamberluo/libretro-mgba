@@ -74,3 +74,5 @@ c7d6f2df18e80730 3b52706bfa2141f6
 6f216f8db8915cb5 3b52706bfa2141f6
 # Shadows built at load; boot-chime driver rejected; held fast-forward takes over: shadow-only.
 95c148ae3534ea1d 3b52706bfa2141f6
+# Long non-looping songs count as music: shadow-only.
+19f637ad39cde591 3b52706bfa2141f6

@@ -24,8 +24,8 @@ enum retro_bgm_status RealtimeBgmLocate(const uint8_t* rom, size_t romSize, stru
 
 typedef uint8_t (*RealtimeBgmRead8)(void* ctx, uint32_t address);
 
-// m4a has no music flag; only music loops.
-bool RealtimeBgmSongLoops(RealtimeBgmRead8 read8, void* ctx, uint32_t songHeader);
+// m4a has no music flag: music loops, has many tracks, or runs long.
+bool RealtimeBgmSongIsMusic(RealtimeBgmRead8 read8, void* ctx, uint32_t songHeader);
 
 struct mCore;
 struct mAudioBuffer;

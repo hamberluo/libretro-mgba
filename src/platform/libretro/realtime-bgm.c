@@ -26,8 +26,7 @@
 #define SENTINEL 0x08000001u
 #define CALL_BUDGET 2000000
 #define MAX_PLAYERS 64
-#define MUSIC_TRACKS_MIN 4
-#define LOOP_CACHE 1024
+#define MUSIC_CACHE 1024
 #define HANDBACK_WAIT_FRAMES 180 // 3 s
 #define CROSSFADE_FRAMES 12      // 200 ms
 #define LANE_FRAMES 0x1000
@@ -61,9 +60,9 @@ struct Shadow {
 	uint32_t mainClock[MAX_PLAYERS]; // per player, as of the last sync
 };
 
-struct LoopEntry {
+struct MusicEntry {
 	uint32_t header;
-	bool loops;
+	bool music;
 };
 
 struct RealtimeBgm {
@@ -79,7 +78,7 @@ struct RealtimeBgm {
 	int playerCount;
 	uint32_t learned[MAX_PLAYERS];
 	int learnedCount;
-	struct LoopEntry loops[LOOP_CACHE];
+	struct MusicEntry music[MUSIC_CACHE];
 
 	enum State state;
 	enum retro_bgm_status status;
@@ -129,27 +128,22 @@ static uint8_t romRead8(void* ctx, uint32_t a) {
 }
 
 // RAM headers are cries, and their address is reused: never music, never cached.
-// A song that does not loop is music by its size: effects in the m4a games
-// measured have at most 3 tracks, their intros and jingles 5 or more.
 static bool musicSong(struct RealtimeBgm* b, uint32_t header) {
 	if (header < ROM_BASE || header - ROM_BASE >= b->romSize) {
 		return false;
 	}
-	if (romRead8(b, header) >= MUSIC_TRACKS_MIN) {
-		return true;
-	}
-	unsigned i = (header >> 2) % LOOP_CACHE;
-	for (unsigned n = 0; n < LOOP_CACHE; ++n, i = (i + 1) % LOOP_CACHE) {
-		if (b->loops[i].header == header) {
-			return b->loops[i].loops;
+	unsigned i = (header >> 2) % MUSIC_CACHE;
+	for (unsigned n = 0; n < MUSIC_CACHE; ++n, i = (i + 1) % MUSIC_CACHE) {
+		if (b->music[i].header == header) {
+			return b->music[i].music;
 		}
-		if (!b->loops[i].header) {
-			b->loops[i].header = header;
-			b->loops[i].loops = RealtimeBgmSongLoops(romRead8, b, header);
-			return b->loops[i].loops;
+		if (!b->music[i].header) {
+			b->music[i].header = header;
+			b->music[i].music = RealtimeBgmSongIsMusic(romRead8, b, header);
+			return b->music[i].music;
 		}
 	}
-	return RealtimeBgmSongLoops(romRead8, b, header);
+	return RealtimeBgmSongIsMusic(romRead8, b, header);
 }
 
 static bool isLearned(const struct RealtimeBgm* b, uint32_t info) {

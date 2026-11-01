@@ -268,18 +268,36 @@ enum retro_bgm_status RealtimeBgmLocate(const uint8_t* rom, size_t romSize, stru
 #define SONG_GOTO 0xB2
 #define SONG_PATT 0xB3
 #define SONG_REPT 0xB5
+#define SONG_WAIT_FIRST 0x80 // W00..W96
+#define SONG_WAIT_LAST 0xB0
 #define TRACK_SCAN_MAX 0x10000
 #define SONG_TRACKS_MAX 16
+// Effects in the m4a games measured have at most 3 tracks and 430 ticks; their
+// non-looping music (intros, jingles) 5 or more tracks, or Mercury's boot song
+// 3 tracks and 1380 ticks.
+#define MUSIC_TRACKS_MIN 4
+#define MUSIC_TICKS_MIN 960
+
+static const uint8_t waitTicks[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+	                                 24, 28, 30, 32, 36, 40, 42, 44, 48, 52, 54, 56, 60, 64, 66, 68, 72, 76, 78, 80, 84, 88,
+	                                 90, 92, 96 };
 
 static uint32_t read32(RealtimeBgmRead8 read8, void* ctx, uint32_t a) {
 	return read8(ctx, a) | read8(ctx, a + 1) << 8 | read8(ctx, a + 2) << 16 | (uint32_t) read8(ctx, a + 3) << 24;
 }
 
-static bool trackLoops(RealtimeBgmRead8 read8, void* ctx, uint32_t track) {
+// Loops, or runs long. Patterns (PATT) are not followed: the length is a floor.
+static bool trackIsMusic(RealtimeBgmRead8 read8, void* ctx, uint32_t track) {
+	unsigned ticks = 0;
 	for (uint32_t a = track; a - track < TRACK_SCAN_MAX; ++a) {
-		switch (read8(ctx, a)) {
+		uint8_t cmd = read8(ctx, a);
+		if (cmd >= SONG_WAIT_FIRST && cmd <= SONG_WAIT_LAST) {
+			ticks += waitTicks[cmd - SONG_WAIT_FIRST];
+			continue;
+		}
+		switch (cmd) {
 		case SONG_FINE:
-			return false;
+			return ticks >= MUSIC_TICKS_MIN;
 		case SONG_GOTO: {
 			uint32_t to = read32(read8, ctx, a + 1);
 			if (to >= track && to < a) {
@@ -301,13 +319,16 @@ static bool trackLoops(RealtimeBgmRead8 read8, void* ctx, uint32_t track) {
 	return false;
 }
 
-bool RealtimeBgmSongLoops(RealtimeBgmRead8 read8, void* ctx, uint32_t songHeader) {
+bool RealtimeBgmSongIsMusic(RealtimeBgmRead8 read8, void* ctx, uint32_t songHeader) {
 	unsigned tracks = read8(ctx, songHeader);
+	if (tracks >= MUSIC_TRACKS_MIN) {
+		return true;
+	}
 	if (tracks > SONG_TRACKS_MAX) {
 		tracks = SONG_TRACKS_MAX;
 	}
 	for (unsigned t = 0; t < tracks; ++t) {
-		if (trackLoops(read8, ctx, read32(read8, ctx, songHeader + 8 + t * 4))) {
+		if (trackIsMusic(read8, ctx, read32(read8, ctx, songHeader + 8 + t * 4))) {
 			return true;
 		}
 	}

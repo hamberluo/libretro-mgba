@@ -44,7 +44,7 @@ static void loop_pointer_byte_is_not_fine(void) {
 	mem[t + 5] = 0xD0; mem[t + 6] = 0x3C;
 	mem[t + 7] = GOTO; put32(t + 8, BASE + t);
 	mem[t + 12] = FINE;
-	CHECK(RealtimeBgmSongLoops(read8, NULL, BASE));
+	CHECK(RealtimeBgmSongIsMusic(read8, NULL, BASE));
 }
 
 // Kirby pads `GOTO ptr W96 FINE`.
@@ -56,7 +56,7 @@ static void loop_goto_wait_fine(void) {
 	mem[t + 2] = GOTO; put32(t + 3, BASE + t);
 	mem[t + 7] = W96;
 	mem[t + 8] = FINE;
-	CHECK(RealtimeBgmSongLoops(read8, NULL, BASE));
+	CHECK(RealtimeBgmSongIsMusic(read8, NULL, BASE));
 }
 
 // Heart and Soul loops on a later track only.
@@ -65,14 +65,25 @@ static void loop_on_track_1_only(void) {
 	song(2, trk);
 	mem[0x40] = 0xD0; mem[0x41] = 0x3C; mem[0x42] = FINE;
 	mem[0x60] = 0xD0; mem[0x61] = 0x3C; mem[0x62] = GOTO; put32(0x63, BASE + 0x60); mem[0x67] = FINE;
-	CHECK(RealtimeBgmSongLoops(read8, NULL, BASE));
+	CHECK(RealtimeBgmSongIsMusic(read8, NULL, BASE));
 }
 
 static void loop_fine_only(void) {
 	uint32_t trk[] = { 0x40 };
 	song(1, trk);
 	mem[0x40] = 0xD0; mem[0x41] = 0x3C; mem[0x42] = W96; mem[0x43] = FINE;
-	CHECK(!RealtimeBgmSongLoops(read8, NULL, BASE));
+	CHECK(!RealtimeBgmSongIsMusic(read8, NULL, BASE));
+}
+
+// Mercury's boot song: 3 tracks, no loop, but longer than any effect (the
+// longest measured is 430 ticks).
+static void long_song_is_music(void) {
+	uint32_t trk[] = { 0x40 };
+	song(1, trk);
+	mem[0x40] = 0xD0; mem[0x41] = 0x3C;
+	memset(&mem[0x42], W96, 10);
+	mem[0x4C] = FINE;
+	CHECK(RealtimeBgmSongIsMusic(read8, NULL, BASE));
 }
 
 int main(void) {
@@ -80,6 +91,7 @@ int main(void) {
 	loop_goto_wait_fine();
 	loop_on_track_1_only();
 	loop_fine_only();
+	long_song_is_music();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-loop: %d failure(s)\n", failures);
 		return 1;
