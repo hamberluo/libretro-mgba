@@ -79,6 +79,7 @@ static void loadActive(void) {
 	CHECK(iwram != NULL);
 	put32(0x03007FF0, BGM_SOUND_INFO);
 	put32(BGM_SOUND_INFO, BGM_ID);
+	put32(BGM_SOUND_INFO + 0x20, BGM_STUB_RETURN | 1); // MPlayMainHead
 	put32(BGM_SOUND_INFO + 0x24, BGM_PLAYER);
 	put32(BGM_PLAYER + 0x34, BGM_ID);
 	retro_bgm_set_speed(4, true);

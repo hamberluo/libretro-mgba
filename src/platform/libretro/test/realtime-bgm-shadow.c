@@ -40,6 +40,7 @@ static struct mCore* mainCore(void) {
 static void soundState(struct mCore* core, bool ident) {
 	core->busWrite32(core, 0x03007FF0, BGM_SOUND_INFO);
 	core->busWrite32(core, BGM_SOUND_INFO, ident ? BGM_ID : 0);
+	core->busWrite32(core, BGM_SOUND_INFO + 0x20, BGM_STUB_RETURN | 1); // MPlayMainHead
 	core->busWrite32(core, BGM_SOUND_INFO + 0x24, BGM_PLAYER);
 	core->busWrite32(core, BGM_PLAYER + 0x34, BGM_ID);
 	core->busWrite32(core, BGM_PLAYER + 0x3C, 0);
@@ -67,7 +68,8 @@ static struct RealtimeBgm* create(struct mCore* core, struct RealtimeBgmM4a m) {
 	return RealtimeBgmCreate(core, rom, sizeof(rom), &m, 65536);
 }
 
-// m4aSoundInit has not run yet (boot logo): stay out this press, take over the next.
+// Fast-forward held from the boot logo, before m4aSoundInit: take over once
+// the driver is up, without another press.
 static void takeover_waits_for_sound_init(void) {
 	struct mCore* core = mainCore();
 	struct RealtimeBgm* bgm = create(core, bgmStubs());
@@ -76,10 +78,28 @@ static void takeover_waits_for_sound_init(void) {
 	RealtimeBgmSetSpeed(bgm, 4, true);
 	CHECK(!RealtimeBgmActive(bgm));
 	CHECK(RealtimeBgmStatus(bgm) == RETRO_BGM_OK);
-	RealtimeBgmSetSpeed(bgm, 1, true);
 	soundInit(core);
 	mainFrames(core, bgm, 1);
+	CHECK(RealtimeBgmActive(bgm));
+	RealtimeBgmDestroy(bgm);
+	RetroAuxCoreDestroy(core);
+}
+
+// The official BIOS plays its boot chime with its own m4a-like driver, ident
+// and all: calling the game's driver on that state never returns, which fell
+// back for the session when fast-forward was pressed on the boot logo.
+static void bios_sound_driver_is_not_the_games(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgm* bgm = create(core, bgmStubs());
+	soundInit(core);
+	core->busWrite32(core, BGM_SOUND_INFO + 0x20, 0x2149); // as the BIOS leaves it
+	mainFrames(core, bgm, 1);
 	RealtimeBgmSetSpeed(bgm, 4, true);
+	mainFrames(core, bgm, 1);
+	CHECK(!RealtimeBgmActive(bgm));
+	CHECK(RealtimeBgmStatus(bgm) == RETRO_BGM_OK);
+	soundInit(core);
+	mainFrames(core, bgm, 1);
 	CHECK(RealtimeBgmActive(bgm));
 	RealtimeBgmDestroy(bgm);
 	RetroAuxCoreDestroy(core);
@@ -266,6 +286,8 @@ static void shadows_run_mains_bios(void) {
 	struct mCore* core = mainCore();
 	core->loadBIOS(core, VFileFromConstMemory(bios, sizeof(bios)), 0);
 	struct RealtimeBgm* bgm = create(core, bgmStubs());
+	// Built with the game, not on the first press: that took ~100 ms on a phone.
+	CHECK(RealtimeBgmLiveShadowsForTesting() == 2);
 	soundInit(core);
 	RealtimeBgmSetSpeed(bgm, 4, true);
 	CHECK(RealtimeBgmActive(bgm));
@@ -376,6 +398,7 @@ static void destroy_mid_handback(void) {
 int main(void) {
 	bgmBuildRom(rom);
 	takeover_waits_for_sound_init();
+	bios_sound_driver_is_not_the_games();
 	budget_falls_back();
 	disable_while_active_hands_back();
 	handback_reuses_shadow();

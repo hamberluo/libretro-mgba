@@ -72,3 +72,5 @@ e02f1e8e5689b78e 3b52706bfa2141f6
 c7d6f2df18e80730 3b52706bfa2141f6
 # Songs of 4+ tracks count as music: shadow-only.
 6f216f8db8915cb5 3b52706bfa2141f6
+# Shadows built at load; boot-chime driver rejected; held fast-forward takes over: shadow-only.
+95c148ae3534ea1d 3b52706bfa2141f6

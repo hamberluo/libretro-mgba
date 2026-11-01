@@ -47,6 +47,7 @@
 #define MP_STATUS_TRACKS 0xFFFFu
 #define MP_STATUS_PAUSE 0x80000000u
 #define TRACK_SIZE 0x50
+#define SOUND_INFO_MAIN_HEAD 0x20
 #define SOUND_INFO_PLAYERS 0x24
 
 enum State { IDLE, ACTIVE, HANDING_BACK, FELL_BACK };
@@ -396,7 +397,9 @@ static void fallBack(struct RealtimeBgm* b, enum retro_bgm_status why) {
 static bool readChain(struct RealtimeBgm* b) {
 	struct GBA* g = b->mainGba;
 	uint32_t si = bus32(g, SOUND_INFO_PTR);
-	if (!inRam(si) || !validIdent(bus32(g, si))) {
+	// The official BIOS plays its boot chime with its own copy of the driver,
+	// ident included; only its function pointers give it away.
+	if (!inRam(si) || !validIdent(bus32(g, si)) || bus32(g, si + SOUND_INFO_MAIN_HEAD) < GBA_SIZE_BIOS) {
 		return false;
 	}
 	b->playerCount = 0;
@@ -449,13 +452,10 @@ static void takeOver(struct RealtimeBgm* b) {
 	if (!readChain(b)) {
 		return;
 	}
-	if (!b->bgm.core && !shadowCreate(b, &b->bgm)) {
+	if (!b->bgm.core || !b->sfx.core) {
+		fallBack(b, RETRO_BGM_CLONE_FAILED);
 		return;
 	}
-	if (!b->sfx.core && !shadowCreate(b, &b->sfx)) {
-		return;
-	}
-	b->sfx.sfx = true;
 	// Untouched: each shadow's first sync stops what is not its own.
 	if (cloneShadows(b)) {
 		b->state = ACTIVE;
@@ -506,6 +506,11 @@ struct RealtimeBgm* RealtimeBgmCreate(struct mCore* main, const void* rom, size_
 	mAudioBufferInit(&b->staging, LANE_FRAMES, 2);
 	mAudioResamplerInit(&b->bgmResampler, mINTERPOLATOR_SINC);
 	mAudioResamplerSetDestination(&b->bgmResampler, &b->bgmOut, outRate);
+	// Here rather than on the first press, where building them (the ROM's
+	// CRC32 above all) stalled a phone for ~100 ms. A failure falls back then.
+	shadowCreate(b, &b->bgm);
+	shadowCreate(b, &b->sfx);
+	b->sfx.sfx = true;
 	return b;
 }
 
@@ -552,6 +557,10 @@ void RealtimeBgmSetSpeed(struct RealtimeBgm* b, double speed, bool enabled) {
 
 void RealtimeBgmAfterMainFrame(struct RealtimeBgm* b) {
 	learn(b);
+	// Held since before m4aSoundInit (the boot logo): no press is coming.
+	if (b->state == IDLE && b->enabled && b->speed > 1) {
+		takeOver(b);
+	}
 	if (b->state != ACTIVE && b->state != HANDING_BACK) {
 		return;
 	}

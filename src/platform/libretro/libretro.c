@@ -2214,7 +2214,6 @@ bool retro_load_game(const struct retro_game_info* game) {
 	_reloadSettings();
 	core->loadROM(core, rom);
 	deferredSetup = true;
-	_realtimeBgmLoad();
 
 	/* Allocate the savedata buffer only as large as this ROM actually needs,
 	 * rather than always reserving the MBC6 worst case (SRAM + 1MB flash =
@@ -2308,6 +2307,8 @@ bool retro_load_game(const struct retro_game_info* game) {
 	}
 #endif
 
+	// After the BIOS: the shadows are built now and must run the same one.
+	_realtimeBgmLoad();
 	return true;
 }
 
