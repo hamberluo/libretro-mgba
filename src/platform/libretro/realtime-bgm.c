@@ -21,6 +21,11 @@
 #define HANDBACK_WAIT_FRAMES 180 // 3 s
 #define CROSSFADE_FRAMES 12      // 200 ms
 #define LANE_FRAMES 0x1000
+#define MUSIC_BUFFER_DIV 8 // the music lane holds 125 ms: a catch-up after a stall
+
+static size_t musicBufferFrames(unsigned outRate) {
+	return outRate / MUSIC_BUFFER_DIV;
+}
 
 enum State { IDLE, ACTIVE, HANDING_BACK, FELL_BACK };
 
@@ -174,7 +179,7 @@ struct RealtimeBgm* RealtimeBgmCreate(struct mCore* main, const void* rom, size_
 	b->engine = *engine;
 	b->status = RETRO_BGM_OK;
 	b->speed = 1;
-	mAudioBufferInit(&b->bgmOut, LANE_FRAMES * 2, 2);
+	mAudioBufferInit(&b->bgmOut, musicBufferFrames(outRate), 2);
 	mAudioBufferInit(&b->staging, LANE_FRAMES, 2);
 	mAudioResamplerInit(&b->bgmResampler, mINTERPOLATOR_SINC);
 	mAudioResamplerSetDestination(&b->bgmResampler, &b->bgmOut, outRate);
@@ -351,6 +356,12 @@ void RealtimeBgmMainJumped(struct RealtimeBgm* b) {
 	} else if (b->state != FELL_BACK) {
 		finishHandBack(b);
 	}
+}
+
+void RealtimeBgmSetOutRate(struct RealtimeBgm* b, unsigned outRate) {
+	mAudioBufferDeinit(&b->bgmOut);
+	mAudioBufferInit(&b->bgmOut, musicBufferFrames(outRate), 2);
+	mAudioResamplerSetDestination(&b->bgmResampler, &b->bgmOut, outRate);
 }
 
 unsigned RealtimeBgmClonesForTesting(void) {

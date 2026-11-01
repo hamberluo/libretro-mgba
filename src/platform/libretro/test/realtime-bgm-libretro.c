@@ -86,12 +86,13 @@ static void loadActive(void) {
 	CHECK(retro_bgm_active());
 }
 
-static void status_gb_is_not_gba(void) {
+// GB, but no Pokémon engine in it.
+static void status_gb_is_unsupported(void) {
 	static uint8_t gbRom[LINK_GB_ROM_SIZE];
 	linkBuildGbRom(gbRom, false);
 	struct retro_game_info info = { .path = NULL, .data = gbRom, .size = sizeof(gbRom) };
 	CHECK(retro_load_game(&info));
-	CHECK(retro_bgm_status() == RETRO_BGM_NOT_GBA);
+	CHECK(retro_bgm_status() == RETRO_BGM_GB_UNSUPPORTED);
 	retro_bgm_set_speed(4, true);
 	CHECK(!retro_bgm_active());
 	retro_unload_game();
@@ -171,7 +172,7 @@ int main(void) {
 	retro_set_input_state(inputState);
 
 	CHECK(retro_bgm_status() == RETRO_BGM_NO_GAME);
-	status_gb_is_not_gba();
+	status_gb_is_unsupported();
 	status_cart_without_driver_is_not_m4a();
 	unserialize_while_active_reclones();
 	rewind_while_active_reclones();

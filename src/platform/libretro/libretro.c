@@ -50,6 +50,7 @@ FS_Archive sdmcArchive;
 #include "libretro_rewind.h"
 #include "realtime-bgm.h"
 #include "realtime-bgm-engine.h"
+#include "realtime-bgm-gb.h"
 #include "rewind.h"
 #include "link.h"
 
@@ -105,8 +106,11 @@ static void _setupMaps(struct mCore* core);
 static size_t _GBSaveRTCSuffixSize(struct mCore* core);
 
 static struct mCore* core;
-// Music at 1x during fast-forward (realtime-bgm.h); GBA games with m4a only.
+// Music at 1x during fast-forward (realtime-bgm.h): GBA games with m4a, Pokémon GB.
 static struct RealtimeBgm* realtimeBgm;
+// GB main audio for one frame, which the realtime BGM may replace at its end.
+static struct mAudioBuffer gbFrameAudio;
+static bool gbFrameAudioInit;
 static _Atomic int bgmStatus = RETRO_BGM_NO_GAME;
 static mColor* outputBuffer = NULL;
 struct mAudioBuffer audioResampleBuffer;
@@ -1469,6 +1473,26 @@ static void _realtimeBgmLoad(void) {
 		}
 	}
 #endif
+#ifdef M_CORE_GB
+	if (core->platform(core) == mPLATFORM_GB) {
+		struct GB* gb = core->board;
+		struct RealtimeBgmGb engineGb;
+		status = RealtimeBgmGbLocate(gb->memory.rom, gb->memory.romSize, &engineGb);
+		if (status == RETRO_BGM_OK) {
+			struct RealtimeBgmEngine engine;
+			if (RealtimeBgmGbEngine(core, &engineGb, &engine)) {
+				realtimeBgm = RealtimeBgmCreate(core, gb->memory.rom, gb->memory.romSize, &engine, core->audioSampleRate(core));
+			}
+			if (!realtimeBgm) {
+				status = RETRO_BGM_GB_UNSUPPORTED;
+			}
+		}
+		if (realtimeBgm && !gbFrameAudioInit) {
+			mAudioBufferInit(&gbFrameAudio, GB_SAMPLES * 8, 2);
+			gbFrameAudioInit = true;
+		}
+	}
+#endif
 	atomic_store(&bgmStatus, status);
 }
 
@@ -1476,6 +1500,10 @@ static void _realtimeBgmLoad(void) {
 static void _realtimeBgmUnload(void) {
 	RealtimeBgmDestroy(realtimeBgm);
 	realtimeBgm = NULL;
+	if (gbFrameAudioInit) {
+		mAudioBufferDeinit(&gbFrameAudio);
+		gbFrameAudioInit = false;
+	}
 	atomic_store(&bgmStatus, RETRO_BGM_NO_GAME);
 }
 
@@ -1845,6 +1873,9 @@ void retro_run(void) {
 
 	/* Check whether audio sample rate has changed */
 	if (updateAudioRate) {
+		if (realtimeBgm) {
+			RealtimeBgmSetOutRate(realtimeBgm, core->audioSampleRate(core));
+		}
 		struct retro_system_av_info info;
 		retro_get_system_av_info(&info);
 		environCallback(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
@@ -1878,6 +1909,18 @@ void retro_run(void) {
                 audioCallback(audioSampleBuffer, samplesProduced);
             }
         }
+	}
+#endif
+#ifdef M_CORE_GB
+	if (realtimeBgm && shown->platform(shown) == mPLATFORM_GB) {
+		struct mAudioBuffer* out = RealtimeBgmGameAudio(realtimeBgm, &gbFrameAudio);
+		size_t n;
+		while ((n = mAudioBufferRead(out, audioSampleBuffer, GB_SAMPLES)) > 0) {
+			if (audioLowPassEnabled) {
+				_audioLowPassFilter(audioSampleBuffer, n);
+			}
+			audioCallback(audioSampleBuffer, n);
+		}
 	}
 #endif
 }
@@ -2714,6 +2757,15 @@ void GBARetroLog(struct mLogger* logger, int category, enum mLogLevel level, con
 /* Used only for GB/GBC content */
 static void _postAudioBuffer(struct mAVStream* stream, struct mAudioBuffer* buffer) {
 	UNUSED(stream);
+	if (realtimeBgm) {
+		// Sent at the end of the frame, once the realtime BGM had its say.
+		int16_t chunk[GB_SAMPLES * 2];
+		size_t n;
+		while ((n = mAudioBufferRead(buffer, chunk, GB_SAMPLES)) > 0) {
+			mAudioBufferWrite(&gbFrameAudio, chunk, n);
+		}
+		return;
+	}
 	int produced = mAudioBufferRead(buffer, audioSampleBuffer, GB_SAMPLES);
 	if (produced > 0) {
 		if (audioLowPassEnabled) {

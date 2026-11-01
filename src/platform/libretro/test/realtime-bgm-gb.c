@@ -222,7 +222,7 @@ static void nr50_mirrored(void) {
 }
 
 int main(void) {
-	gbBuildRom(rom);
+	gbBuildRom(rom, false);
 	gen2_music_shadow_calls_engine();
 	gen2_music_sync_turns_effects_off();
 	gen2_effect_sync_turns_music_off();

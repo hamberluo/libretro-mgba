@@ -82,3 +82,5 @@ c7d6f2df18e80730 3b52706bfa2141f6
 b79476179fe4f92d 3b52706bfa2141f6
 # Pokémon GB realtime BGM shadows: shadow-only.
 dcef45538aa25f46 3b52706bfa2141f6
+# realtime BGM for Pokémon GB in libretro.c: GB audio of games with the module goes out at frame end; link untouched.
+ad5621e99a5ef60d 3b52706bfa2141f6

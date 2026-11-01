@@ -54,6 +54,8 @@ struct mAudioBuffer* RealtimeBgmGameAudio(struct RealtimeBgm*, struct mAudioBuff
 bool RealtimeBgmActive(const struct RealtimeBgm*);
 enum retro_bgm_status RealtimeBgmStatus(const struct RealtimeBgm*);
 void RealtimeBgmMainJumped(struct RealtimeBgm*);
+// The music lane's output rate, when the content's changes (GB).
+void RealtimeBgmSetOutRate(struct RealtimeBgm*, unsigned outRate);
 
 // Process-wide, so tests that only drive libretro.c can read them.
 unsigned RealtimeBgmClonesForTesting(void);
