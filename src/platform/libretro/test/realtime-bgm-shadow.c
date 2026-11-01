@@ -304,6 +304,37 @@ static void fade_consumes_all_of_main(void) {
 	RetroAuxCoreDestroy(core);
 }
 
+// Mercury slows an effect for the speed it saw, so the effects shadow, at the
+// game's own tempo, finishes first: it must not start the effect over while
+// main still plays it, only when the game starts it again.
+static void finished_effect_is_not_replayed(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgmM4a m = bgmStubs();
+	m.mplayStart = BGM_STUB_START;
+	struct RealtimeBgm* bgm = create(core, m);
+	soundInit(core);
+	core->busWrite32(core, BGM_PLAYER, BGM_JINGLE);
+	core->busWrite32(core, BGM_PLAYER + 4, 1);
+	core->busWrite32(core, BGM_PLAYER + 0x0C, 5);
+	mainFrames(core, bgm, 1);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	struct mCore* fx = RealtimeBgmShadowForTesting(bgm, true);
+	fx->busWrite32(fx, BGM_PLAYER + 4, 0);
+	core->busWrite32(core, BGM_PLAYER + 0x0C, 6);
+	mainFrames(core, bgm, 2);
+	CHECK(fx->busRead32(fx, BGM_PLAYER + 4) == 0);
+	// MPlayStart as a frame sees it: tracks off, clock 0; playing a frame later.
+	core->busWrite32(core, BGM_PLAYER + 4, 0);
+	core->busWrite32(core, BGM_PLAYER + 0x0C, 0);
+	mainFrames(core, bgm, 1);
+	core->busWrite32(core, BGM_PLAYER + 4, 1);
+	core->busWrite32(core, BGM_PLAYER + 0x0C, 1);
+	mainFrames(core, bgm, 1);
+	CHECK(fx->busRead32(fx, BGM_PLAYER + 4) == 1);
+	RealtimeBgmDestroy(bgm);
+	RetroAuxCoreDestroy(core);
+}
+
 // Unloading mid hand-back frees both shadows (ASan reports a leak or a UAF).
 static void destroy_mid_handback(void) {
 	struct mCore* core = mainCore();
@@ -334,6 +365,7 @@ int main(void) {
 	repress_mid_fade_ramps_back();
 	shadows_run_mains_bios();
 	fade_consumes_all_of_main();
+	finished_effect_is_not_replayed();
 	destroy_mid_handback();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-shadow: %d failure(s)\n", failures);

@@ -19,6 +19,7 @@
 #define BGM_ROM_SIZE 0x80000
 #define BGM_STUB_RETURN 0x08000100 // bx lr
 #define BGM_STUB_SPIN 0x08000108   // b .
+#define BGM_STUB_START 0x08000120  // marks the player as playing, as MPlayStart does
 #define BGM_SONG 0x08000200        // 1 track: note, GOTO back, FINE
 #define BGM_JINGLE 0x08000240      // 1 track: note, FINE (a sound effect)
 
@@ -35,6 +36,9 @@ static inline void bgmBuildRom(uint8_t* rom) {
 	memcpy(&rom[0xC0], &spin, 4);
 	rom[0x100] = 0x70; rom[0x101] = 0x47; // bx lr
 	rom[0x108] = 0xFE; rom[0x109] = 0xE7; // b .
+	rom[0x120] = 0x01; rom[0x121] = 0x22; // movs r2, #1
+	rom[0x122] = 0x42; rom[0x123] = 0x60; // str r2, [r0, #4]
+	rom[0x124] = 0x70; rom[0x125] = 0x47; // bx lr
 	const uint32_t track = BGM_SONG + 0x10;
 	rom[0x200] = 1;
 	memcpy(&rom[0x208], &track, 4);

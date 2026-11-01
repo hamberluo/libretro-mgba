@@ -35,6 +35,7 @@
 #define MP_HEADER 0x00
 #define MP_STATUS 0x04
 #define MP_TRACK_COUNT 0x08
+#define MP_CLOCK 0x0C
 #define MP_TEMPO_U 0x1E
 #define MP_FADE_OI 0x24
 #define MP_FADE_OC 0x26
@@ -55,6 +56,7 @@ struct Shadow {
 	mColor* video;
 	uint32_t sp;
 	bool sfx;
+	uint32_t mainClock[MAX_PLAYERS]; // per player, as of the last sync
 };
 
 struct LoopEntry {
@@ -168,6 +170,12 @@ static void learn(struct RealtimeBgm* b) {
 	}
 }
 
+// Only MPlayStart resets a player's clock, and it shows a frame before the
+// player plays again, so a stopped player reads as the latest possible time.
+static uint32_t startClock(struct GBA* g, uint32_t info) {
+	return bus32(g, info + MP_STATUS) & MP_STATUS_TRACKS ? bus32(g, info + MP_CLOCK) : UINT32_MAX;
+}
+
 static bool shadowCreate(struct RealtimeBgm* b, struct Shadow* s) {
 	s->core = mCoreCreate(mPLATFORM_GBA);
 	if (!s->core) {
@@ -226,6 +234,9 @@ static bool shadowClone(struct RealtimeBgm* b, struct Shadow* s) {
 	s->gba->memory.io[GBA_REG(IME)] = 0;
 	GBAHalt(s->gba);
 	s->gba->audio.masterVolume = b->mainGba->audio.masterVolume;
+	for (int p = 0; p < b->playerCount; ++p) {
+		s->mainClock[p] = startClock(b->mainGba, b->players[p]);
+	}
 	mAudioBufferClear(s->core->getAudioBuffer(s->core));
 	return true;
 }
@@ -314,7 +325,8 @@ static void copyControls(struct Shadow* s, struct GBA* main, uint32_t info) {
 }
 
 // Declarative: match main's state instead of replaying control calls.
-static bool syncPlayer(struct RealtimeBgm* b, struct Shadow* s, uint32_t info) {
+static bool syncPlayer(struct RealtimeBgm* b, struct Shadow* s, int p) {
+	uint32_t info = b->players[p];
 	struct GBA* main = b->mainGba;
 	struct ARMCore* sc = s->gba->cpu;
 	uint32_t mHeader = bus32(main, info + MP_HEADER), sHeader = bus32(s->gba, info + MP_HEADER);
@@ -322,8 +334,13 @@ static bool syncPlayer(struct RealtimeBgm* b, struct Shadow* s, uint32_t info) {
 	bool mPlaying = isPlaying(mStatus), sPlaying = isPlaying(sStatus);
 	bool music = isLearned(b, info) || songLoops(b, mHeader);
 	bool wanted = s->sfx ? !music : music;
+	// The shadow finishing first is no restart: Mercury slows main's effects
+	// for the speed it saw.
+	uint32_t clock = startClock(main, info);
+	bool restarted = clock < s->mainClock[p];
+	s->mainClock[p] = clock;
 	bool ok = true;
-	if (mPlaying && wanted && (mHeader != sHeader || !(sStatus & MP_STATUS_TRACKS))) {
+	if (mPlaying && wanted && (mHeader != sHeader || restarted)) {
 		copyRamSong(s, main, mHeader);
 		ok = shadowCall(s, b->m4a.mplayStart, info, mHeader);
 	} else if (mPlaying && wanted && !sPlaying) {
@@ -350,7 +367,7 @@ static bool syncPlayer(struct RealtimeBgm* b, struct Shadow* s, uint32_t info) {
 // skipping it after a clone runs the PCM DMA past its buffer (FE8).
 static bool shadowFrame(struct RealtimeBgm* b, struct Shadow* s) {
 	for (int p = 0; p < b->playerCount; ++p) {
-		if (!syncPlayer(b, s, b->players[p])) {
+		if (!syncPlayer(b, s, p)) {
 			return false;
 		}
 	}
