@@ -30,6 +30,12 @@ struct RealtimeBgmGb {
 #define REALTIME_BGM_GB1_AUDIO_BANK 0xC0EFu // gen1 wAudioROMBank
 #define REALTIME_BGM_GB1_DRUM_MAX 0x13      // gen1 channel 8 ids 01-13: the music's drums
 
+struct mCore;
+struct RealtimeBgmEngine;
+
+// The Pokémon GB adapter for realtime-bgm.c.
+bool RealtimeBgmGbEngine(struct mCore* main, const struct RealtimeBgmGb* gb, struct RealtimeBgmEngine* out);
+
 enum retro_bgm_status RealtimeBgmGbLocate(const uint8_t* rom, size_t romSize, struct RealtimeBgmGb* out);
 void RealtimeBgmGbSetLocateOverrideForTesting(const struct RealtimeBgmGb* gb);
 
