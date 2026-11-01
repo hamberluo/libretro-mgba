@@ -30,6 +30,7 @@ enum retro_bgm_status {
 	RETRO_BGM_CHAIN_INVALID = 6, // fell back this session
 	RETRO_BGM_BUDGET = 7,        // fell back this session
 	RETRO_BGM_CLONE_FAILED = 8,  // fell back this session
+	RETRO_BGM_GB_UNSUPPORTED = 9, // GB/GBC, but not a Pokémon gen1/gen2 engine
 };
 
 // Above this speed only music plays: compressed sound effects are noise.

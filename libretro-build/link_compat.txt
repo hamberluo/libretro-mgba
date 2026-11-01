@@ -78,3 +78,5 @@ c7d6f2df18e80730 3b52706bfa2141f6
 19f637ad39cde591 3b52706bfa2141f6
 # realtime-bgm engine split: pure move.
 53bf702f38992e65 3b52706bfa2141f6
+# Pokémon GB locator + RETRO_BGM_GB_UNSUPPORTED: realtime BGM only.
+b79476179fe4f92d 3b52706bfa2141f6

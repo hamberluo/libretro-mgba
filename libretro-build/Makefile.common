@@ -133,6 +133,7 @@ SOURCES_C :=   $(CORE_DIR)/src/arm/arm.c \
 					$(CORE_DIR)/src/platform/libretro/realtime-bgm.c \
 					$(CORE_DIR)/src/platform/libretro/realtime-bgm-m4a.c \
 					$(CORE_DIR)/src/platform/libretro/realtime-bgm-locate.c \
+					$(CORE_DIR)/src/platform/libretro/realtime-bgm-gb-locate.c \
 					$(CORE_DIR)/src/sm83/isa-sm83.c \
 					$(CORE_DIR)/src/sm83/sm83.c \
 					$(CORE_DIR)/src/third-party/inih/ini.c \
