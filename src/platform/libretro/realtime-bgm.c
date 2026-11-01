@@ -350,15 +350,21 @@ static bool syncPlayer(struct RealtimeBgm* b, struct Shadow* s, uint32_t info) {
 	return ok;
 }
 
-// One frame: sync from main, run to VBlank, then the driver's per-frame calls.
+// One frame. A core stops at the start of VBlank, before the game's VBlank
+// work runs, so the driver's per-frame calls come first: after a clone that
+// is the VSync main had pending, without which the PCM DMA runs past its
+// buffer for a whole frame and plays whatever memory follows (FE8).
 static bool shadowFrame(struct RealtimeBgm* b, struct Shadow* s) {
 	for (int p = 0; p < b->playerCount; ++p) {
 		if (!syncPlayer(b, s, b->players[p])) {
 			return false;
 		}
 	}
+	if (!shadowCall(s, b->m4a.soundVSync, 0, 0) || !shadowCall(s, b->m4a.soundMain, 0, 0)) {
+		return false;
+	}
 	s->core->runFrame(s->core);
-	return shadowCall(s, b->m4a.soundVSync, 0, 0) && shadowCall(s, b->m4a.soundMain, 0, 0);
+	return true;
 }
 
 // --- state machine -------------------------------------------------------------
@@ -428,13 +434,17 @@ static void finishHandBack(struct RealtimeBgm* b) {
 	mAudioBufferClear(&b->staging);
 }
 
-// Every playing music player runs at the same tempo in main as in the music
-// shadow: the game is no longer compensating for a speed it measured.
+// Every playing player runs at the same tempo in main as in the shadow that
+// plays it: the game is no longer compensating for a speed it measured, on
+// music or on sound effects.
 static bool tempoSettled(struct RealtimeBgm* b) {
 	for (int p = 0; p < b->playerCount; ++p) {
 		uint32_t info = b->players[p];
-		if (isLearned(b, info) && isPlaying(bus32(b->mainGba, info + MP_STATUS)) &&
-		    bus16(b->mainGba, info + MP_TEMPO_U) != bus16(b->bgm.gba, info + MP_TEMPO_U)) {
+		if (!isPlaying(bus32(b->mainGba, info + MP_STATUS))) {
+			continue;
+		}
+		const struct Shadow* owner = isLearned(b, info) || songLoops(b, bus32(b->mainGba, info + MP_HEADER)) ? &b->bgm : &b->sfx;
+		if (bus16(b->mainGba, info + MP_TEMPO_U) != bus16(owner->gba, info + MP_TEMPO_U)) {
 			return false;
 		}
 	}
@@ -623,6 +633,10 @@ void RealtimeBgmMainJumped(struct RealtimeBgm* b) {
 
 unsigned RealtimeBgmClonesForTesting(void) {
 	return clones;
+}
+
+struct mCore* RealtimeBgmShadowForTesting(struct RealtimeBgm* b, bool sfx) {
+	return sfx ? b->sfx.core : b->bgm.core;
 }
 
 unsigned RealtimeBgmLiveShadowsForTesting(void) {

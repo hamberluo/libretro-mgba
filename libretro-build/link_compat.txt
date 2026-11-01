@@ -55,3 +55,8 @@ d37af963146c0e87 ce073aafdeac8985
 # Flash memory block size counts from the current bank: debugger/scripting
 # view only, never read by emulation or link. link-compat passes.
 d795413520e930fb 3b52706bfa2141f6
+# Realtime BGM (aux-core.c, realtime-bgm*.c, libretro.c hooks): shadows are
+# extra cores that never touch link cores and are destroyed before
+# retro_link_begin; link.c's aux core helpers moved verbatim to aux-core.c.
+# link-compat passes, so 2P frames are untouched.
+8198dc58cd0be529 3b52706bfa2141f6

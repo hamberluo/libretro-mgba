@@ -67,6 +67,8 @@ void RealtimeBgmMainJumped(struct RealtimeBgm*);
 // Test hooks: process-wide counters, so tests that only see libretro.c can use them.
 unsigned RealtimeBgmClonesForTesting(void);
 unsigned RealtimeBgmLiveShadowsForTesting(void);
+// The music (false) or sound effects (true) shadow, NULL before the first takeover.
+struct mCore* RealtimeBgmShadowForTesting(struct RealtimeBgm*, bool sfx);
 // Makes RealtimeBgmLocate answer `m4a` (NULL restores the scan).
 void RealtimeBgmSetLocateOverrideForTesting(const struct RealtimeBgmM4a* m4a);
 

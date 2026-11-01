@@ -20,6 +20,7 @@
 #define BGM_STUB_RETURN 0x08000100 // bx lr
 #define BGM_STUB_SPIN 0x08000108   // b .
 #define BGM_SONG 0x08000200        // 1 track: note, GOTO back, FINE
+#define BGM_JINGLE 0x08000240      // 1 track: note, FINE (a sound effect)
 
 #define BGM_SOUND_INFO 0x03001000
 #define BGM_PLAYER 0x03001400
@@ -41,6 +42,11 @@ static inline void bgmBuildRom(uint8_t* rom) {
 	rom[0x212] = 0xB2;                    // GOTO track
 	memcpy(&rom[0x213], &track, 4);
 	rom[0x217] = 0xB1;                    // FINE
+	const uint32_t jingle = BGM_JINGLE + 0x10;
+	rom[0x240] = 1;
+	memcpy(&rom[0x248], &jingle, 4);
+	rom[0x250] = 0xD0; rom[0x251] = 0x3C; // note
+	rom[0x252] = 0xB1;                    // FINE
 }
 
 static inline struct RealtimeBgmM4a bgmStubs(void) {

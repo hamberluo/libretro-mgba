@@ -155,6 +155,27 @@ static void handback_waits_for_main_tempo(void) {
 	RetroAuxCoreDestroy(core);
 }
 
+// The game also slows its sound effects for the speed it saw (Mercury, with
+// no music playing): main's effects would come back low, so wait for those too.
+static void handback_waits_for_effects_tempo(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgm* bgm = create(core, bgmStubs());
+	soundInit(core);
+	core->busWrite32(core, BGM_PLAYER, BGM_JINGLE);
+	core->busWrite32(core, BGM_PLAYER + 4, 1);
+	mainFrames(core, bgm, 1);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	core->busWrite16(core, BGM_PLAYER + 0x1E, 64);
+	RealtimeBgmSetSpeed(bgm, 1, true);
+	RealtimeBgmRun(bgm, 60);
+	CHECK(RealtimeBgmActive(bgm));
+	core->busWrite16(core, BGM_PLAYER + 0x1E, 0x100);
+	RealtimeBgmRun(bgm, CROSSFADE_FRAMES + 2);
+	CHECK(!RealtimeBgmActive(bgm));
+	RealtimeBgmDestroy(bgm);
+	RetroAuxCoreDestroy(core);
+}
+
 // Unloading mid hand-back frees both shadows (ASan reports a leak or a UAF).
 static void destroy_mid_handback(void) {
 	struct mCore* core = mainCore();
@@ -179,6 +200,7 @@ int main(void) {
 	disable_while_active_hands_back();
 	handback_reuses_shadow();
 	handback_waits_for_main_tempo();
+	handback_waits_for_effects_tempo();
 	destroy_mid_handback();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-shadow: %d failure(s)\n", failures);
