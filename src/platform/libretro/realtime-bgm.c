@@ -82,8 +82,8 @@ struct RealtimeBgm {
 	double speed;
 	bool enabled;
 	unsigned waitFrames;
-	bool fading;
-	unsigned fadeFrames;
+	bool fading;         // handing back with main's tempo settled
+	unsigned fadeFrames; // hand-back progress: rises while fading, falls back when active
 
 	struct mAudioResampler bgmResampler;
 	struct mAudioBuffer bgmOut;
@@ -428,6 +428,7 @@ static void takeOver(struct RealtimeBgm* b) {
 static void finishHandBack(struct RealtimeBgm* b) {
 	b->state = IDLE;
 	b->fading = false;
+	b->fadeFrames = 0;
 	mAudioBufferClear(&b->bgmOut);
 	mAudioBufferClear(&b->staging);
 }
@@ -448,7 +449,7 @@ static bool tempoSettled(struct RealtimeBgm* b) {
 }
 
 static double fadeAngle(const struct RealtimeBgm* b) {
-	return M_PI / 2 * (b->fading ? (double) b->fadeFrames / CROSSFADE_FRAMES : 0);
+	return M_PI / 2 * b->fadeFrames / CROSSFADE_FRAMES;
 }
 
 struct RealtimeBgm* RealtimeBgmCreate(struct mCore* main, const void* rom, size_t romSize,
@@ -498,7 +499,6 @@ void RealtimeBgmSetSpeed(struct RealtimeBgm* b, double speed, bool enabled) {
 			b->state = HANDING_BACK;
 			b->waitFrames = 0;
 			b->fading = false;
-			b->fadeFrames = 0;
 		}
 		break;
 	case HANDING_BACK:
@@ -535,14 +535,13 @@ void RealtimeBgmRun(struct RealtimeBgm* b, unsigned frames) {
 		struct mAudioBuffer* out = b->bgm.core->getAudioBuffer(b->bgm.core);
 		mAudioResamplerSetSource(&b->bgmResampler, out, b->bgm.core->audioSampleRate(b->bgm.core), true);
 		mAudioResamplerProcess(&b->bgmResampler);
-		if (b->state != HANDING_BACK) {
-			continue;
-		}
-		if (!b->fading) {
-			if (tempoSettled(b) || ++b->waitFrames >= HANDBACK_WAIT_FRAMES) {
-				b->fading = true;
-				b->fadeFrames = 0;
+		if (b->state == ACTIVE) {
+			// Pressed again mid fade: ramp back rather than snap (a click).
+			if (b->fadeFrames > 0) {
+				--b->fadeFrames;
 			}
+		} else if (!b->fading) {
+			b->fading = tempoSettled(b) || ++b->waitFrames >= HANDBACK_WAIT_FRAMES;
 		} else if (++b->fadeFrames >= CROSSFADE_FRAMES) {
 			finishHandBack(b);
 		}
@@ -555,7 +554,7 @@ size_t RealtimeBgmRead(struct RealtimeBgm* b, int16_t* out, size_t maxFrames) {
 		return 0;
 	}
 	size_t n = mAudioBufferRead(&b->bgmOut, out, maxFrames);
-	if (b->fading) {
+	if (b->fadeFrames > 0) {
 		double gain = cos(fadeAngle(b));
 		for (size_t i = 0; i < n * 2; ++i) {
 			out[i] = (int16_t) (out[i] * gain);
@@ -587,9 +586,9 @@ struct mAudioBuffer* RealtimeBgmGameAudio(struct RealtimeBgm* b, struct mAudioBu
 		if (compressed) {
 			return silence(b, mainBuffer);
 		}
-		break;
+		// fall through: a fade may still be ramping back
 	case HANDING_BACK:
-		if (b->fading) {
+		if (b->fadeFrames > 0) {
 			struct mAudioBuffer* fx = b->sfx.core->getAudioBuffer(b->sfx.core);
 			size_t n = mAudioBufferAvailable(mainBuffer);
 			if (mAudioBufferAvailable(fx) < n) {

@@ -64,3 +64,5 @@ d795413520e930fb 3b52706bfa2141f6
 83a02ea85b381ba9 3b52706bfa2141f6
 # Quality pass: comments, crossfade gains, idle silence past 8x, reset hand-back; shadow-only.
 1bb64ddb8a92314a 3b52706bfa2141f6
+# Hand-back fade ramps back on a re-press: shadow-only.
+943a1b22cb38d585 3b52706bfa2141f6

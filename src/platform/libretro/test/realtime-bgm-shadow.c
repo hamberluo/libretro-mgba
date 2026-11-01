@@ -219,6 +219,39 @@ static void idle_past_8x_is_silent(void) {
 	RetroAuxCoreDestroy(core);
 }
 
+// Main's level in what audio_batch plays after one main frame, fed a
+// constant 1000 (the stub driver keeps the shadows silent).
+static int16_t gameLaneLevel(struct mCore* core, struct RealtimeBgm* bgm) {
+	mainFrames(core, bgm, 1);
+	struct mAudioBuffer main;
+	mAudioBufferInit(&main, 64, 2);
+	int16_t loud[32 * 2];
+	for (int i = 0; i < 64; ++i) loud[i] = 1000;
+	mAudioBufferWrite(&main, loud, 32);
+	int16_t got[32 * 2] = { 0 };
+	mAudioBufferRead(RealtimeBgmGameAudio(bgm, &main), got, 32);
+	mAudioBufferDeinit(&main);
+	return got[0];
+}
+
+// Pressing again halfway through the hand-back fade ramps back to the
+// shadows instead of snapping to them (a click).
+static void repress_mid_fade_ramps_back(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgm* bgm = create(core, bgmStubs());
+	soundInit(core);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	RealtimeBgmSetSpeed(bgm, 1, true);
+	RealtimeBgmRun(bgm, 1 + CROSSFADE_FRAMES / 2);
+	CHECK(gameLaneLevel(core, bgm) > 0);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	CHECK(gameLaneLevel(core, bgm) > 0);
+	RealtimeBgmRun(bgm, CROSSFADE_FRAMES);
+	CHECK(gameLaneLevel(core, bgm) == 0);
+	RealtimeBgmDestroy(bgm);
+	RetroAuxCoreDestroy(core);
+}
+
 // Unloading mid hand-back frees both shadows (ASan reports a leak or a UAF).
 static void destroy_mid_handback(void) {
 	struct mCore* core = mainCore();
@@ -246,6 +279,7 @@ int main(void) {
 	handback_waits_for_effects_tempo();
 	clone_releases_driver_locks();
 	idle_past_8x_is_silent();
+	repress_mid_fade_ramps_back();
 	destroy_mid_handback();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-shadow: %d failure(s)\n", failures);
