@@ -20,8 +20,10 @@
 #define BGM_STUB_RETURN 0x08000100 // bx lr
 #define BGM_STUB_SPIN 0x08000108   // b .
 #define BGM_STUB_START 0x08000120  // marks the player as playing, as MPlayStart does
+#define BGM_STUB_STOP 0x08000128   // marks it stopped, as MPlayStop does
 #define BGM_SONG 0x08000200        // 1 track: note, GOTO back, FINE
 #define BGM_JINGLE 0x08000240      // 1 track: note, FINE (a sound effect)
+#define BGM_INTRO 0x08000280       // 4 tracks: note, FINE (music that does not loop)
 
 #define BGM_SOUND_INFO 0x03001000
 #define BGM_PLAYER 0x03001400
@@ -39,6 +41,9 @@ static inline void bgmBuildRom(uint8_t* rom) {
 	rom[0x120] = 0x01; rom[0x121] = 0x22; // movs r2, #1
 	rom[0x122] = 0x42; rom[0x123] = 0x60; // str r2, [r0, #4]
 	rom[0x124] = 0x70; rom[0x125] = 0x47; // bx lr
+	rom[0x128] = 0x00; rom[0x129] = 0x22; // movs r2, #0
+	rom[0x12A] = 0x42; rom[0x12B] = 0x60; // str r2, [r0, #4]
+	rom[0x12C] = 0x70; rom[0x12D] = 0x47; // bx lr
 	const uint32_t track = BGM_SONG + 0x10;
 	rom[0x200] = 1;
 	memcpy(&rom[0x208], &track, 4);
@@ -51,6 +56,13 @@ static inline void bgmBuildRom(uint8_t* rom) {
 	memcpy(&rom[0x248], &jingle, 4);
 	rom[0x250] = 0xD0; rom[0x251] = 0x3C; // note
 	rom[0x252] = 0xB1;                    // FINE
+	const uint32_t intro = BGM_INTRO + 0x20;
+	rom[0x280] = 4;
+	for (int t = 0; t < 4; ++t) {
+		memcpy(&rom[0x288 + t * 4], &intro, 4);
+	}
+	rom[0x2A0] = 0xD0; rom[0x2A1] = 0x3C; // note
+	rom[0x2A2] = 0xB1;                    // FINE
 }
 
 static inline struct RealtimeBgmM4a bgmStubs(void) {

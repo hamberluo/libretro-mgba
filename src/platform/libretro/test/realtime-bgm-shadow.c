@@ -335,6 +335,27 @@ static void finished_effect_is_not_replayed(void) {
 	RetroAuxCoreDestroy(core);
 }
 
+// An intro before any looping song (fast-forward at boot): no effect in the
+// m4a games measured has more than 3 tracks, and their non-looping music 5 to 16.
+static void many_track_song_is_music(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgmM4a m = bgmStubs();
+	m.mplayStop = BGM_STUB_STOP;
+	struct RealtimeBgm* bgm = create(core, m);
+	soundInit(core);
+	core->busWrite32(core, BGM_PLAYER, BGM_INTRO);
+	core->busWrite32(core, BGM_PLAYER + 4, 1);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	mainFrames(core, bgm, 1);
+	RealtimeBgmRun(bgm, 1);
+	struct mCore* music = RealtimeBgmShadowForTesting(bgm, false);
+	struct mCore* fx = RealtimeBgmShadowForTesting(bgm, true);
+	CHECK(music->busRead32(music, BGM_PLAYER + 4) == 1);
+	CHECK(fx->busRead32(fx, BGM_PLAYER + 4) == 0);
+	RealtimeBgmDestroy(bgm);
+	RetroAuxCoreDestroy(core);
+}
+
 // Unloading mid hand-back frees both shadows (ASan reports a leak or a UAF).
 static void destroy_mid_handback(void) {
 	struct mCore* core = mainCore();
@@ -366,6 +387,7 @@ int main(void) {
 	shadows_run_mains_bios();
 	fade_consumes_all_of_main();
 	finished_effect_is_not_replayed();
+	many_track_song_is_music();
 	destroy_mid_handback();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-shadow: %d failure(s)\n", failures);

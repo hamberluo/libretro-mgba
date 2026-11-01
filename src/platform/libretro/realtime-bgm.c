@@ -26,6 +26,7 @@
 #define SENTINEL 0x08000001u
 #define CALL_BUDGET 2000000
 #define MAX_PLAYERS 64
+#define MUSIC_TRACKS_MIN 4
 #define LOOP_CACHE 1024
 #define HANDBACK_WAIT_FRAMES 180 // 3 s
 #define CROSSFADE_FRAMES 12      // 200 ms
@@ -127,9 +128,14 @@ static uint8_t romRead8(void* ctx, uint32_t a) {
 }
 
 // RAM headers are cries, and their address is reused: never music, never cached.
-static bool songLoops(struct RealtimeBgm* b, uint32_t header) {
+// A song that does not loop is music by its size: effects in the m4a games
+// measured have at most 3 tracks, their intros and jingles 5 or more.
+static bool musicSong(struct RealtimeBgm* b, uint32_t header) {
 	if (header < ROM_BASE || header - ROM_BASE >= b->romSize) {
 		return false;
+	}
+	if (romRead8(b, header) >= MUSIC_TRACKS_MIN) {
+		return true;
 	}
 	unsigned i = (header >> 2) % LOOP_CACHE;
 	for (unsigned n = 0; n < LOOP_CACHE; ++n, i = (i + 1) % LOOP_CACHE) {
@@ -164,7 +170,7 @@ static void learn(struct RealtimeBgm* b) {
 	uint32_t pi = bus32(g, si + SOUND_INFO_PLAYERS);
 	for (int n = 0; n < MAX_PLAYERS && inRam(pi) && validIdent(bus32(g, pi + MP_IDENT)); ++n, pi = bus32(g, pi + MP_NEXT)) {
 		if (b->learnedCount < MAX_PLAYERS && !isLearned(b, pi) && isPlaying(bus32(g, pi + MP_STATUS)) &&
-		    songLoops(b, bus32(g, pi + MP_HEADER))) {
+		    musicSong(b, bus32(g, pi + MP_HEADER))) {
 			b->learned[b->learnedCount++] = pi;
 		}
 	}
@@ -332,7 +338,7 @@ static bool syncPlayer(struct RealtimeBgm* b, struct Shadow* s, int p) {
 	uint32_t mHeader = bus32(main, info + MP_HEADER), sHeader = bus32(s->gba, info + MP_HEADER);
 	uint32_t mStatus = bus32(main, info + MP_STATUS), sStatus = bus32(s->gba, info + MP_STATUS);
 	bool mPlaying = isPlaying(mStatus), sPlaying = isPlaying(sStatus);
-	bool music = isLearned(b, info) || songLoops(b, mHeader);
+	bool music = isLearned(b, info) || musicSong(b, mHeader);
 	bool wanted = s->sfx ? !music : music;
 	// The shadow finishing first is no restart: Mercury slows main's effects
 	// for the speed it saw.
@@ -471,7 +477,7 @@ static bool tempoSettled(struct RealtimeBgm* b) {
 		if (!isPlaying(bus32(b->mainGba, info + MP_STATUS))) {
 			continue;
 		}
-		const struct Shadow* owner = isLearned(b, info) || songLoops(b, bus32(b->mainGba, info + MP_HEADER)) ? &b->bgm : &b->sfx;
+		const struct Shadow* owner = isLearned(b, info) || musicSong(b, bus32(b->mainGba, info + MP_HEADER)) ? &b->bgm : &b->sfx;
 		if (bus16(b->mainGba, info + MP_TEMPO_U) != bus16(owner->gba, info + MP_TEMPO_U)) {
 			return false;
 		}

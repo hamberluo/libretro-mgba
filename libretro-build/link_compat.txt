@@ -70,3 +70,5 @@ d795413520e930fb 3b52706bfa2141f6
 e02f1e8e5689b78e 3b52706bfa2141f6
 # Effects shadow restarts a song only when the game does: shadow-only.
 c7d6f2df18e80730 3b52706bfa2141f6
+# Songs of 4+ tracks count as music: shadow-only.
+6f216f8db8915cb5 3b52706bfa2141f6
