@@ -12,6 +12,7 @@
 #include <mgba/core/core.h>
 #include <mgba/internal/gb/gb.h>
 #include <mgba/internal/gb/io.h>
+#include <mgba/internal/sm83/sm83.h>
 #include <mgba-util/vfs.h>
 
 #include <stdio.h>
@@ -221,6 +222,37 @@ static void nr50_mirrored(void) {
 	done(bgm, core);
 }
 
+// gen1's map-change fade lives in home code no shadow runs: cloned mid-fade,
+// the effects shadow kept main's near-silent master volume for the whole press.
+static void effects_follow_main_volume(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgm* bgm = create(core, gen1());
+	core->busWrite8(core, REALTIME_BGM_GB1_AUDIO_BANK, 1);
+	core->busWrite8(core, IDS + 0, 0x01);
+	core->busWrite8(core, 0xFF24, 0x00);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	core->busWrite8(core, 0xFF24, 0x77);
+	mainFrames(core, bgm, 1);
+	CHECK(shadow(bgm, true)->busRead8(shadow(bgm, true), 0xFF24) == 0x77);
+	done(bgm, core);
+}
+
+// Some copy loops point SP into ROM (ld sp,hl): a call made from there would
+// push into the MBC. Wait for a frame where SP is back in RAM.
+static void sp_outside_ram_waits(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgm* bgm = create(core, gen2());
+	channelOn(core, 0, 0x10);
+	struct GB* gb = core->board;
+	gb->cpu->sp = 0x4000;
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	CHECK(!RealtimeBgmActive(bgm));
+	gb->cpu->sp = 0xDFF0;
+	mainFrames(core, bgm, 1);
+	CHECK(RealtimeBgmActive(bgm));
+	done(bgm, core);
+}
+
 int main(void) {
 	gbBuildRom(rom, false);
 	gen2_music_shadow_calls_engine();
@@ -232,6 +264,8 @@ int main(void) {
 	budget_falls_back();
 	boot_rom_not_ready();
 	nr50_mirrored();
+	effects_follow_main_volume();
+	sp_outside_ram_waits();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-gb: %d failure(s)\n", failures);
 		return 1;

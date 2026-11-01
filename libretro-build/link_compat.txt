@@ -84,3 +84,5 @@ b79476179fe4f92d 3b52706bfa2141f6
 dcef45538aa25f46 3b52706bfa2141f6
 # realtime BGM for Pokémon GB in libretro.c: GB audio of games with the module goes out at frame end; link untouched.
 ad5621e99a5ef60d 3b52706bfa2141f6
+# Review fixes for Pokémon GB realtime BGM: shadow-only.
+1240bbb822e829b6 3b52706bfa2141f6

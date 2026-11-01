@@ -17,7 +17,6 @@
 
 #define CALL_BUDGET 4000000 // SM83 ticks
 #define SENTINEL 0x0000     // return address: the reset vector, never a sound routine's caller
-#define GEN2_GLOBALS 0x40   // engine state after wChannel8
 #define GEN1_RAM 0xC000
 #define GEN1_RAM_END 0xC100
 #define MUSIC_CHANNELS 4
@@ -96,7 +95,7 @@ static void copySoundRam(const struct Gb* e, const struct RealtimeBgmShadow* s) 
 	uint16_t from = GEN1_RAM, to = GEN1_RAM_END;
 	if (e->gb.family == REALTIME_BGM_GB_GEN2) {
 		from = e->gb.musicPlaying;
-		to = channel(e, CHANNELS) + GEN2_GLOBALS;
+		to = channel(e, CHANNELS) + REALTIME_BGM_GB2_GLOBALS;
 	}
 	for (uint32_t a = from; a < to; ++a) {
 		wr(gbOf(s), a, rd(e->mainGb, a));
@@ -163,11 +162,15 @@ static bool callEngine(const struct Gb* e, const struct RealtimeBgmShadow* s) {
 	return !e->gb.updateMusic[bank] || call(e, s, bank, e->gb.updateMusic[bank]);
 }
 
-// The boot ROM covers bank 0 until the game writes FF50.
+// The boot ROM covers bank 0 until the game writes FF50. Calls push below the
+// clone's SP, which some copy loops point into ROM (ld sp,hl): wait for RAM.
 static bool ready(void* state, enum retro_bgm_status* fail) {
 	UNUSED(fail);
 	struct Gb* e = state;
-	return e->mainGb->memory.io[GB_REG_BANK] != 0xFF;
+	uint16_t sp = e->mainGb->cpu->sp;
+	bool spInRam = (sp >= GB_BASE_WORKING_RAM_BANK0 + 2 && sp < GB_BASE_WORKING_RAM_BANK0 + 0x2000) ||
+	               (sp >= GB_BASE_HRAM + 2 && sp <= GB_BASE_HRAM + GB_SIZE_HRAM);
+	return e->mainGb->memory.io[GB_REG_BANK] != 0xFF && spInRam;
 }
 
 static void cloned(void* state, struct RealtimeBgmShadow* s) {
@@ -200,10 +203,9 @@ static bool frame(void* state, struct RealtimeBgmShadow* s) {
 	if (!sync && !callEngine(e, s)) {
 		return false;
 	}
-	if (!s->sfx) {
-		// gen1 fades out on map changes from home code, straight into NR50.
-		wr(gbOf(s), GB_BASE_IO | GB_REG_NR50, rd(e->mainGb, GB_BASE_IO | GB_REG_NR50));
-	}
+	// Shadows never run home code, where gen1 sets the master volume (its map
+	// change fade): follow main's.
+	wr(gbOf(s), GB_BASE_IO | GB_REG_NR50, rd(e->mainGb, GB_BASE_IO | GB_REG_NR50));
 	return true;
 }
 

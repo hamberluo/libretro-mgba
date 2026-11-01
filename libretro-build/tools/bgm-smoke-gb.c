@@ -8,7 +8,8 @@
 //   gbmusic warm frames N   main at Nx; music shadow vs a 1x reference, on frames with no effect
 //   gbsfx   warm frames     lockstep; effects shadow vs main, per hardware channel an effect owns
 //   ff      warm frames N   main at Nx; status must stay ok, both lanes audible
-// env: PRESS (A / Start / Down held 6 frames every 40), GB_MODEL=DMG|SGB|CGB
+// env: PRESS (A / Start / Down held 6 frames every 40), GB_MODEL=DMG|SGB|CGB,
+//      DIFF=n (gbmusic: print the first n differing frames)
 
 #include "../../src/platform/libretro/aux-core.h"
 #include "../../src/platform/libretro/realtime-bgm.h"
@@ -176,6 +177,16 @@ static bool sameWrites(int fa, int fb, int hw) {
 	return na == nb && !memcmp(a, b, na * 2);
 }
 
+static void printWrites(const char* who, int f) {
+	uint16_t w[256];
+	size_t n = frameWrites(&logs[who[0] == 's'], f, -1, w, 256);
+	printf("  f%d %s:", f, who);
+	for (size_t i = 0; i < n; ++i) {
+		printf(" %02X=%02X", w[i] >> 8, w[i] & 0xFF);
+	}
+	printf("\n");
+}
+
 static void warmUp(int warm) {
 	for (int f = 0; f < warm; ++f) {
 		mainFrame(NULL, NULL);
@@ -210,7 +221,13 @@ static int gbmusic(int warm, int frames, int speed) {
 			continue;
 		}
 		++checked;
-		same += sameWrites(f, f, -1);
+		bool ok = sameWrites(f, f, -1);
+		same += ok;
+		static int shown;
+		if (!ok && getenv("DIFF") && shown++ < atoi(getenv("DIFF"))) {
+			printWrites("ref", f);
+			printWrites("shadow", f);
+		}
 	}
 	printf("music %dx: identical %d/%d (%.1f%%) status=%d\n", speed, same, checked, checked ? 100.0 * same / checked : 0,
 	       RealtimeBgmStatus(bgm));

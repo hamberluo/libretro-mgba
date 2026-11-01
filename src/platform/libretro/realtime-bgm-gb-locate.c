@@ -12,6 +12,9 @@
 #define GEN2_SCAN 0x400      // where the channel loop's stride is found
 #define CHANNEL_LENGTH_MAX 0x40
 #define GEN1_SIG_SIZE 10
+#define WRAM_BASE 0xC000
+#define WRAM_END 0xE000 // echo RAM from here
+#define BANKS 256       // bank numbers are 8-bit
 
 static bool override;
 static struct RealtimeBgmGb overrideGb;
@@ -44,7 +47,7 @@ static bool gen2At(const uint8_t* rom, size_t romSize, size_t o, struct Realtime
 		return false;
 	}
 	uint16_t mp = le16(p + 1);
-	if (mp < 0xC000 || mp >= 0xE000 || le16(p + 13) != mp + 1) {
+	if (mp < WRAM_BASE || le16(p + 13) != mp + 1) {
 		return false;
 	}
 	size_t end = o + GEN2_SCAN < romSize ? o + GEN2_SCAN : romSize;
@@ -53,7 +56,9 @@ static bool gen2At(const uint8_t* rom, size_t romSize, size_t o, struct Realtime
 	for (size_t a = o + GEN2_HEAD_SIZE; a < end && length < 0; ++a) {
 		length = ldHlAddBc(rom + a, end - a, 0x4D, 0x44); // ld c,l; ld b,h
 	}
-	if (flags < 0 || length <= 0 || length > CHANNEL_LENGTH_MAX || flags >= length) {
+	// The shadows copy every channel and the globals after them.
+	if (flags < 0 || length <= 0 || length > CHANNEL_LENGTH_MAX || flags >= length ||
+	    mp + 1 + 8 * length + REALTIME_BGM_GB2_GLOBALS > WRAM_END) {
 		return false;
 	}
 	*out = (struct RealtimeBgmGb) {
@@ -73,11 +78,15 @@ static bool gen1(const uint8_t* rom, size_t romSize, struct RealtimeBgmGb* out) 
 	static const uint8_t head[] = { 0x0E, 0x00, 0x06, 0x00, 0x21 };
 	static const uint8_t tail[] = { 0x09, 0x7E, 0xA7 };
 	memset(out, 0, sizeof(*out));
-	for (size_t o = BANK_SIZE; o + GEN1_SIG_SIZE <= romSize && o / BANK_SIZE < 256; ++o) {
+	for (size_t o = BANK_SIZE; o + GEN1_SIG_SIZE <= romSize && o / BANK_SIZE < BANKS; ++o) {
 		if (memcmp(rom + o, head, sizeof(head)) || memcmp(rom + o + 7, tail, sizeof(tail))) {
 			continue;
 		}
 		uint16_t ids = le16(rom + o + 5);
+		// The shadows copy C000-C0FF and keep wAudioROMBank: the table must fit before it.
+		if (ids < WRAM_BASE || ids + 8 > REALTIME_BGM_GB1_AUDIO_BANK) {
+			return false;
+		}
 		if (out->family && ids != out->soundIds) {
 			return false;
 		}
@@ -93,7 +102,7 @@ enum retro_bgm_status RealtimeBgmGbLocate(const uint8_t* rom, size_t romSize, st
 		*out = overrideGb;
 		return RETRO_BGM_OK;
 	}
-	for (size_t o = BANK_SIZE; o + GEN2_HEAD_SIZE <= romSize; ++o) {
+	for (size_t o = BANK_SIZE; o + GEN2_HEAD_SIZE <= romSize && o / BANK_SIZE < BANKS; ++o) {
 		if (gen2At(rom, romSize, o, out)) {
 			return RETRO_BGM_OK;
 		}
