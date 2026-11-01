@@ -125,12 +125,12 @@ static void handback_reuses_shadow(void) {
 	struct RealtimeBgm* bgm = create(core, bgmStubs());
 	soundInit(core);
 	RealtimeBgmSetSpeed(bgm, 4, true);
-	unsigned clones = RealtimeBgmCloneCountForTesting(bgm);
+	unsigned clones = RealtimeBgmClonesForTesting();
 	RealtimeBgmSetSpeed(bgm, 1, true);
 	RealtimeBgmRun(bgm, 1);
 	RealtimeBgmSetSpeed(bgm, 4, true);
 	CHECK(RealtimeBgmActive(bgm));
-	CHECK(RealtimeBgmCloneCountForTesting(bgm) == clones);
+	CHECK(RealtimeBgmClonesForTesting() == clones);
 	RealtimeBgmDestroy(bgm);
 	RetroAuxCoreDestroy(core);
 }

@@ -64,8 +64,11 @@ enum retro_bgm_status RealtimeBgmStatus(const struct RealtimeBgm*);
 // Main's state was replaced (load state, rewind, reset): reclone if active.
 void RealtimeBgmMainJumped(struct RealtimeBgm*);
 
-unsigned RealtimeBgmCloneCountForTesting(const struct RealtimeBgm*);
+// Test hooks: process-wide counters, so tests that only see libretro.c can use them.
+unsigned RealtimeBgmClonesForTesting(void);
 unsigned RealtimeBgmLiveShadowsForTesting(void);
+// Makes RealtimeBgmLocate answer `m4a` (NULL restores the scan).
+void RealtimeBgmSetLocateOverrideForTesting(const struct RealtimeBgmM4a* m4a);
 
 CXX_GUARD_END
 

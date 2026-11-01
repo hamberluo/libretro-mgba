@@ -84,7 +84,6 @@ struct RealtimeBgm {
 	unsigned waitFrames;
 	bool fading;
 	unsigned fadeFrames;
-	unsigned clones;
 
 	struct mAudioResampler bgmResampler;
 	struct mAudioBuffer bgmOut;
@@ -94,6 +93,7 @@ struct RealtimeBgm {
 };
 
 static unsigned liveShadows;
+static unsigned clones;
 
 static uint32_t bus32(struct GBA* gba, uint32_t a) {
 	return gba->cpu->memory.load32(gba->cpu, a, NULL);
@@ -401,7 +401,7 @@ static void cloneShadows(struct RealtimeBgm* b) {
 	shadowClone(b, &b->bgm);
 	shadowClone(b, &b->sfx);
 	mAudioBufferClear(&b->bgmOut);
-	++b->clones;
+	++clones;
 }
 
 static void takeOver(struct RealtimeBgm* b) {
@@ -621,8 +621,8 @@ void RealtimeBgmMainJumped(struct RealtimeBgm* b) {
 	}
 }
 
-unsigned RealtimeBgmCloneCountForTesting(const struct RealtimeBgm* b) {
-	return b->clones;
+unsigned RealtimeBgmClonesForTesting(void) {
+	return clones;
 }
 
 unsigned RealtimeBgmLiveShadowsForTesting(void) {

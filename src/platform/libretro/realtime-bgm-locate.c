@@ -235,8 +235,18 @@ static uint32_t findMPlayStop(const struct Scan* s, uint32_t mplayStart) {
 	return 0;
 }
 
+static const struct RealtimeBgmM4a* locateOverride;
+
+void RealtimeBgmSetLocateOverrideForTesting(const struct RealtimeBgmM4a* m4a) {
+	locateOverride = m4a;
+}
+
 enum retro_bgm_status RealtimeBgmLocate(const uint8_t* rom, size_t romSize, struct RealtimeBgmM4a* out) {
 	struct Scan s = { rom, romSize };
+	if (locateOverride) {
+		*out = *locateOverride;
+		return RETRO_BGM_OK;
+	}
 	memset(out, 0, sizeof(*out));
 	out->soundMain = findSoundMain(&s);
 	if (!out->soundMain) {

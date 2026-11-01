@@ -27,6 +27,7 @@
 #include <mgba/internal/gba/gba.h>
 #endif
 #include <mgba-util/memory.h>
+#include <stdatomic.h>
 #include <mgba-util/vfs.h>
 
 #ifndef __LIBRETRO__
@@ -43,8 +44,10 @@ FS_Archive sdmcArchive;
 #endif
 
 #include "libretro_core_options.h"
+#include "libretro_bgm.h"
 #include "libretro_link.h"
 #include "libretro_rewind.h"
+#include "realtime-bgm.h"
 #include "rewind.h"
 #include "link.h"
 
@@ -82,6 +85,7 @@ static bool libretro_supports_bitmasks = false;
 static void GBARetroLog(struct mLogger* logger, int category, enum mLogLevel level, const char* format, va_list args);
 
 static void _postAudioBuffer(struct mAVStream*, struct mAudioBuffer*);
+static void _linkEnd(void);
 static void _audioRateChanged(struct mAVStream*, unsigned rate);
 static struct mCore* _outputCore(void);
 static void _setRumble(struct mRumbleIntegrator*, float level);
@@ -99,6 +103,9 @@ static void _setupMaps(struct mCore* core);
 static size_t _GBSaveRTCSuffixSize(struct mCore* core);
 
 static struct mCore* core;
+// Music at 1x during fast-forward (realtime-bgm.h); GBA games with m4a only.
+static struct RealtimeBgm* realtimeBgm;
+static _Atomic int bgmStatus = RETRO_BGM_NO_GAME;
 static mColor* outputBuffer = NULL;
 struct mAudioBuffer audioResampleBuffer;
 struct mAudioResampler audioResampler;
@@ -1435,6 +1442,44 @@ void retro_get_system_av_info(struct retro_system_av_info* info) {
 #endif
 }
 
+static void _realtimeBgmStatus(void) {
+	if (realtimeBgm) {
+		atomic_store(&bgmStatus, RealtimeBgmStatus(realtimeBgm));
+	}
+}
+
+// Locates the driver in what main mapped, which also covers games opened by path.
+static void _realtimeBgmLoad(void) {
+	enum retro_bgm_status status = RETRO_BGM_NOT_GBA;
+#ifdef M_CORE_GBA
+	if (core->platform(core) == mPLATFORM_GBA) {
+		struct GBA* gba = core->board;
+		struct RealtimeBgmM4a m4a;
+		status = RealtimeBgmLocate((const uint8_t*) gba->memory.rom, gba->memory.romSize, &m4a);
+		if (status == RETRO_BGM_OK) {
+			realtimeBgm = RealtimeBgmCreate(core, gba->memory.rom, gba->memory.romSize, &m4a, targetSampleRate);
+			if (!realtimeBgm) {
+				status = RETRO_BGM_NOT_M4A;
+			}
+		}
+	}
+#endif
+	atomic_store(&bgmStatus, status);
+}
+
+// Before main's core and ROM go: the shadows map main's ROM.
+static void _realtimeBgmUnload(void) {
+	RealtimeBgmDestroy(realtimeBgm);
+	realtimeBgm = NULL;
+	atomic_store(&bgmStatus, RETRO_BGM_NO_GAME);
+}
+
+static void _realtimeBgmMainJumped(void) {
+	if (realtimeBgm) {
+		RealtimeBgmMainJumped(realtimeBgm);
+	}
+}
+
 void retro_init(void) {
 	enum retro_pixel_format fmt;
 #ifdef COLOR_16_BIT
@@ -1539,6 +1584,7 @@ void retro_init(void) {
 
 void retro_deinit(void) {
 	RetroRewindConfigure(&rewindRing, 0);
+	_realtimeBgmUnload();
 	if (outputBuffer) {
 #ifdef _3DS
 		linearFree(outputBuffer);
@@ -1753,6 +1799,10 @@ void retro_run(void) {
 	} else {
 		core->runFrame(core);
 		RetroRewindFrame(&rewindRing, core);
+		if (realtimeBgm) {
+			RealtimeBgmAfterMainFrame(realtimeBgm);
+			_realtimeBgmStatus();
+		}
 	}
 	unsigned width, height;
 	shown->currentVideoSize(shown, &width, &height);
@@ -1799,6 +1849,9 @@ void retro_run(void) {
 #ifdef M_CORE_GBA
 	if (shown->platform(shown) == mPLATFORM_GBA) {
 		struct mAudioBuffer *coreBuffer = shown->getAudioBuffer(shown);
+		if (realtimeBgm) {
+			coreBuffer = RealtimeBgmGameAudio(realtimeBgm, coreBuffer);
+		}
         int coreSamplesAvail = mAudioBufferAvailable(coreBuffer);
         if (coreSamplesAvail > 0) {
             unsigned coreSampleRate = shown->audioSampleRate(shown);
@@ -2023,6 +2076,7 @@ void retro_reset(void) {
 	}
 	core->reset(core);
 	RetroRewindClear(&rewindRing);
+	_realtimeBgmMainJumped();
 	mRumbleIntegratorReset(&rumble);
 	_setupMaps(core);
 }
@@ -2159,6 +2213,7 @@ bool retro_load_game(const struct retro_game_info* game) {
 	_reloadSettings();
 	core->loadROM(core, rom);
 	deferredSetup = true;
+	_realtimeBgmLoad();
 
 	/* Allocate the savedata buffer only as large as this ROM actually needs,
 	 * rather than always reserving the MBC6 worst case (SRAM + 1MB flash =
@@ -2260,9 +2315,8 @@ void retro_unload_game(void) {
 		return;
 	}
 	RetroRewindConfigure(&rewindRing, 0);
-	if (activeLink) {
-		retro_link_end();
-	}
+	_linkEnd();
+	_realtimeBgmUnload();
 	mCoreConfigDeinit(&core->config);
 	core->deinit(core);
 	// deinit frees the core, so clear the pointer with the rest: the guard
@@ -2322,6 +2376,7 @@ bool retro_unserialize(const void* data, size_t size) {
 	vfm->close(vfm);
 	if (success) {
 		RetroRewindClear(&rewindRing);
+		_realtimeBgmMainJumped();
 	}
 	return success;
 }
@@ -2956,6 +3011,7 @@ RETRO_API bool retro_link_begin(unsigned players, unsigned localPlayer,
 	}
 	// The single-player machine is replaced by the local player's linked one;
 	// `savedata` stays the SAVE_RAM buffer the frontend holds.
+	_realtimeBgmUnload();
 	mCoreConfigDeinit(&core->config);
 	core->deinit(core);
 	activeLink = created;
@@ -3002,7 +3058,7 @@ RETRO_API uint64_t retro_link_core_id(void) {
 	return RETRO_LINK_CORE_ID;
 }
 
-RETRO_API void retro_link_end(void) {
+static void _linkEnd(void) {
 	if (!activeLink) {
 		return;
 	}
@@ -3020,6 +3076,15 @@ RETRO_API void retro_link_end(void) {
 	_freeLinkBuffers();
 }
 
+RETRO_API void retro_link_end(void) {
+	if (!activeLink) {
+		return;
+	}
+	_linkEnd();
+	// A new local core: find its driver again.
+	_realtimeBgmLoad();
+}
+
 /* GoGBA extension: see libretro_rewind.h. */
 RETRO_API void retro_rewind_configure(unsigned seconds) {
 	RetroRewindConfigure(&rewindRing, seconds);
@@ -3029,5 +3094,36 @@ RETRO_API unsigned retro_rewind_step(unsigned seconds) {
 	if (!core || activeLink) {
 		return 0;
 	}
-	return RetroRewindStep(&rewindRing, core, seconds);
+	unsigned stepped = RetroRewindStep(&rewindRing, core, seconds);
+	if (stepped) {
+		_realtimeBgmMainJumped();
+	}
+	return stepped;
+}
+
+/* GoGBA extension: see libretro_bgm.h. */
+RETRO_API int retro_bgm_status(void) {
+	return atomic_load(&bgmStatus);
+}
+
+RETRO_API void retro_bgm_set_speed(double speed, bool enabled) {
+	if (realtimeBgm) {
+		RealtimeBgmSetSpeed(realtimeBgm, speed, enabled);
+		_realtimeBgmStatus();
+	}
+}
+
+RETRO_API void retro_bgm_run(unsigned frames) {
+	if (realtimeBgm) {
+		RealtimeBgmRun(realtimeBgm, frames);
+		_realtimeBgmStatus();
+	}
+}
+
+RETRO_API size_t retro_bgm_read(int16_t* out, size_t max_frames) {
+	return realtimeBgm ? RealtimeBgmRead(realtimeBgm, out, max_frames) : 0;
+}
+
+RETRO_API bool retro_bgm_active(void) {
+	return realtimeBgm && RealtimeBgmActive(realtimeBgm);
 }
