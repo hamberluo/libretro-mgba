@@ -8,6 +8,7 @@
 #include "realtime-bgm-rom.h"
 
 #include <mgba/core/core.h>
+#include <mgba-util/audio-buffer.h>
 #include <mgba-util/vfs.h>
 
 #include <stdio.h>
@@ -196,6 +197,28 @@ static void clone_releases_driver_locks(void) {
 	RetroAuxCoreDestroy(core);
 }
 
+// Past 8x before m4aSoundInit the shadows are not in yet, but Dart already
+// skipped the forced mute on the strength of the status: main's compressed
+// audio must not play.
+static void idle_past_8x_is_silent(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgm* bgm = create(core, bgmStubs());
+	RealtimeBgmSetSpeed(bgm, 16, true);
+	CHECK(!RealtimeBgmActive(bgm));
+	struct mAudioBuffer main;
+	mAudioBufferInit(&main, 64, 2);
+	int16_t loud[32 * 2];
+	for (int i = 0; i < 64; ++i) loud[i] = 1000;
+	mAudioBufferWrite(&main, loud, 32);
+	struct mAudioBuffer* out = RealtimeBgmGameAudio(bgm, &main);
+	int16_t got[32 * 2] = { 0 };
+	CHECK(mAudioBufferRead(out, got, 32) == 32);
+	CHECK(got[0] == 0 && got[63] == 0);
+	mAudioBufferDeinit(&main);
+	RealtimeBgmDestroy(bgm);
+	RetroAuxCoreDestroy(core);
+}
+
 // Unloading mid hand-back frees both shadows (ASan reports a leak or a UAF).
 static void destroy_mid_handback(void) {
 	struct mCore* core = mainCore();
@@ -222,6 +245,7 @@ int main(void) {
 	handback_waits_for_main_tempo();
 	handback_waits_for_effects_tempo();
 	clone_releases_driver_locks();
+	idle_past_8x_is_silent();
 	destroy_mid_handback();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-shadow: %d failure(s)\n", failures);

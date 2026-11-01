@@ -132,11 +132,12 @@ static void rewind_while_active_reclones(void) {
 	retro_rewind_configure(0);
 }
 
-static void reset_while_active_reclones(void) {
+// A reset lands before m4aSoundInit: the shadows step aside until the next
+// press instead of replacing main's audio with a driver that never starts.
+static void reset_while_active_hands_back(void) {
 	loadActive();
-	unsigned clones = RealtimeBgmClonesForTesting();
 	retro_reset();
-	CHECK(RealtimeBgmClonesForTesting() == clones + 1);
+	CHECK(!retro_bgm_active());
 	retro_unload_game();
 }
 
@@ -173,7 +174,7 @@ int main(void) {
 	status_cart_without_driver_is_not_m4a();
 	unserialize_while_active_reclones();
 	rewind_while_active_reclones();
-	reset_while_active_reclones();
+	reset_while_active_hands_back();
 	unload_while_active_frees_shadows();
 	deinit_without_unload_frees_shadows();
 	if (failures) {

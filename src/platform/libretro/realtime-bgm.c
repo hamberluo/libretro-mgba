@@ -119,15 +119,12 @@ static bool validIdent(uint32_t v) {
 	return v - M4A_ID <= 1; // ID, or ID+1 while the driver holds its lock
 }
 
-// --- songs -------------------------------------------------------------------
-
 static uint8_t romRead8(void* ctx, uint32_t a) {
 	const struct RealtimeBgm* b = ctx;
 	return a >= ROM_BASE && a - ROM_BASE < b->romSize ? b->rom[a - ROM_BASE] : 0;
 }
 
-// Only ROM songs are judged: a header the game builds in RAM is a cry, and
-// its address is reused for other content, so it could not be cached anyway.
+// RAM headers are cries, and their address is reused: never music, never cached.
 static bool songLoops(struct RealtimeBgm* b, uint32_t header) {
 	if (header < ROM_BASE || header - ROM_BASE >= b->romSize) {
 		return false;
@@ -155,8 +152,7 @@ static bool isLearned(const struct RealtimeBgm* b, uint32_t info) {
 	return false;
 }
 
-// A player that has played a looping song is a music player from then on, so
-// its intros and fanfares stay with the music too.
+// Sticky, so a music player's intros and fanfares stay music.
 static void learn(struct RealtimeBgm* b) {
 	struct GBA* g = b->mainGba;
 	uint32_t si = bus32(g, SOUND_INFO_PTR);
@@ -171,8 +167,6 @@ static void learn(struct RealtimeBgm* b) {
 		}
 	}
 }
-
-// --- shadow cores --------------------------------------------------------------
 
 static bool shadowCreate(struct RealtimeBgm* b, struct Shadow* s) {
 	s->core = mCoreCreate(mPLATFORM_GBA);
@@ -209,7 +203,7 @@ static void shadowDestroy(struct Shadow* s) {
 	s->video = NULL;
 }
 
-// Main's state, then parked: nothing but our calls may wake the CPU.
+// Parked: only our calls may wake it.
 static void shadowClone(struct RealtimeBgm* b, struct Shadow* s) {
 	size_t size = b->main->stateSize(b->main);
 	void* state = malloc(size);
@@ -217,8 +211,7 @@ static void shadowClone(struct RealtimeBgm* b, struct Shadow* s) {
 	s->core->loadState(s->core, state);
 	free(state);
 	struct ARMCore* cpu = s->gba->cpu;
-	// Below the system-mode SP is free stack by the ABI, and game code never
-	// runs on a shadow again.
+	// Free below SP by the ABI, and game code never runs here again.
 	ARMSetPrivilegeMode(cpu, MODE_SYSTEM);
 	s->sp = cpu->gprs[ARM_SP];
 	s->gba->memory.io[GBA_REG(IE)] = 0;
@@ -228,7 +221,7 @@ static void shadowClone(struct RealtimeBgm* b, struct Shadow* s) {
 	mAudioBufferClear(s->core->getAudioBuffer(s->core));
 }
 
-// Calls a Thumb function on the parked CPU; false if it ran past the budget.
+// False if the call ran past the budget.
 static bool shadowCall(struct Shadow* s, uint32_t fn, uint32_t r0, uint32_t r1) {
 	struct ARMCore* cpu = s->gba->cpu;
 	cpu->halted = 0;
@@ -260,8 +253,7 @@ static void copyBytes(struct Shadow* s, struct GBA* main, uint32_t a, uint32_t n
 	}
 }
 
-// A header the game built in RAM (Pokemon cries carry per-species pitch and
-// length there): the shadow's copy dates from the clone, so bring it up to date.
+// Cries are built in RAM (species pitch, length); the clone's copy is stale.
 static void copyRamSong(struct Shadow* s, struct GBA* main, uint32_t header) {
 	if (!inRam(header)) {
 		return;
@@ -283,11 +275,8 @@ static void copyRamSong(struct Shadow* s, struct GBA* main, uint32_t header) {
 	}
 }
 
-// Per-track volume/pan/pitch the game applied after starting the song: what
-// m4aMPlayVolumeControl / PanpotControl / PitchControl leave behind.
 static void copyControls(struct Shadow* s, struct GBA* main, uint32_t info) {
-	// A player whose tempo the game moved is being compensated for the speed
-	// (Mercury); the shadow already ignores tempo, so that pitch goes too.
+	// A moved tempo is speed compensation (Mercury): drop its pitch with it.
 	bool pitch = bus16(main, info + MP_TEMPO_U) == 0x100;
 	static const struct {
 		uint8_t offset;
@@ -315,8 +304,7 @@ static void copyControls(struct Shadow* s, struct GBA* main, uint32_t info) {
 	}
 }
 
-// Declarative: make the shadow's player match main's for the songs this
-// shadow owns, instead of replaying the game's control calls.
+// Declarative: match main's state instead of replaying control calls.
 static bool syncPlayer(struct RealtimeBgm* b, struct Shadow* s, uint32_t info) {
 	struct GBA* main = b->mainGba;
 	struct ARMCore* sc = s->gba->cpu;
@@ -342,18 +330,15 @@ static bool syncPlayer(struct RealtimeBgm* b, struct Shadow* s, uint32_t info) {
 		sc->memory.store16(sc, info + MP_FADE_OC, bus16(main, info + MP_FADE_OC), NULL);
 		sc->memory.store16(sc, info + MP_FADE_OV, bus16(main, info + MP_FADE_OV), NULL);
 	}
-	// Music ignores volume and pitch control on purpose (cry ducking, speed
-	// compensation); sound effects need them.
+	// Music ignores volume and pitch on purpose (cry ducking, compensation).
 	if (s->sfx && mPlaying && bus32(s->gba, info + MP_HEADER) == mHeader) {
 		copyControls(s, main, info);
 	}
 	return ok;
 }
 
-// One frame. A core stops at the start of VBlank, before the game's VBlank
-// work runs, so the driver's per-frame calls come first: after a clone that
-// is the VSync main had pending, without which the PCM DMA runs past its
-// buffer for a whole frame and plays whatever memory follows (FE8).
+// Driver calls first: a core stops at VBlank with the game's VSync pending, and
+// skipping it after a clone runs the PCM DMA past its buffer (FE8).
 static bool shadowFrame(struct RealtimeBgm* b, struct Shadow* s) {
 	for (int p = 0; p < b->playerCount; ++p) {
 		if (!syncPlayer(b, s, b->players[p])) {
@@ -367,8 +352,6 @@ static bool shadowFrame(struct RealtimeBgm* b, struct Shadow* s) {
 	return true;
 }
 
-// --- state machine -------------------------------------------------------------
-
 static void fallBack(struct RealtimeBgm* b, enum retro_bgm_status why) {
 	b->status = why;
 	b->state = FELL_BACK;
@@ -377,8 +360,7 @@ static void fallBack(struct RealtimeBgm* b, enum retro_bgm_status why) {
 	mAudioBufferClear(&b->bgmOut);
 }
 
-// The driver's own player chain. False to stay out for now: m4aSoundInit has
-// not run (boot logo) or opened no players yet.
+// False to retry on the next press: before m4aSoundInit there is no chain.
 static bool readChain(struct RealtimeBgm* b) {
 	struct GBA* g = b->mainGba;
 	uint32_t si = bus32(g, SOUND_INFO_PTR);
@@ -403,9 +385,8 @@ static bool readChain(struct RealtimeBgm* b) {
 	return b->playerCount > 0;
 }
 
-// A clone can land while main is inside a driver call (a lag frame), with its
-// locks reading ID+1. No game code runs on a shadow to release them, and the
-// driver returns early on a held lock, so restore what the call writes on exit.
+// A clone taken mid driver call keeps its ID+1 locks forever: release them as
+// the interrupted call would.
 static void releaseDriverLocks(struct RealtimeBgm* b, struct Shadow* s) {
 	struct ARMCore* cpu = s->gba->cpu;
 	uint32_t si = bus32(s->gba, SOUND_INFO_PTR);
@@ -439,8 +420,7 @@ static void takeOver(struct RealtimeBgm* b) {
 		return;
 	}
 	b->sfx.sfx = true;
-	// Untouched at the clone: what is sounding keeps sounding, and each
-	// shadow's first sync stops what is not its own.
+	// Untouched: each shadow's first sync stops what is not its own.
 	cloneShadows(b);
 	b->state = ACTIVE;
 }
@@ -452,9 +432,7 @@ static void finishHandBack(struct RealtimeBgm* b) {
 	mAudioBufferClear(&b->staging);
 }
 
-// Every playing player runs at the same tempo in main as in the shadow that
-// plays it: the game is no longer compensating for a speed it measured, on
-// music or on sound effects.
+// The game has stopped compensating, on music and effects alike.
 static bool tempoSettled(struct RealtimeBgm* b) {
 	for (int p = 0; p < b->playerCount; ++p) {
 		uint32_t info = b->players[p];
@@ -601,9 +579,9 @@ struct mAudioBuffer* RealtimeBgmGameAudio(struct RealtimeBgm* b, struct mAudioBu
 	bool compressed = b->enabled && b->speed > RETRO_BGM_SFX_SPEED_MAX;
 	switch (b->state) {
 	case IDLE:
-		return mainBuffer;
 	case FELL_BACK:
-		// Mute policy upstream only knew the status at load time.
+		// Dart skips the forced mute on the load-time status: before sound init,
+		// or after a fall back, compressed audio is still noise.
 		return compressed ? silence(b, mainBuffer) : mainBuffer;
 	case ACTIVE:
 		if (compressed) {
@@ -622,7 +600,9 @@ struct mAudioBuffer* RealtimeBgmGameAudio(struct RealtimeBgm* b, struct mAudioBu
 			}
 			mAudioBufferRead(mainBuffer, b->mixA, n);
 			mAudioBufferRead(fx, b->mixB, n);
-			double angle = fadeAngle(b), shadowGain = cos(angle), mainGain = sin(angle);
+			// Equal power against the uncorrelated music lane; the effects in main
+			// and in the shadow are in phase, so theirs sum to one.
+			double mainGain = sin(fadeAngle(b)), shadowGain = 1 - mainGain;
 			for (size_t i = 0; i < n * 2; ++i) {
 				b->mixA[i] = (int16_t) (b->mixA[i] * mainGain + b->mixB[i] * shadowGain);
 			}
@@ -644,8 +624,14 @@ enum retro_bgm_status RealtimeBgmStatus(const struct RealtimeBgm* b) {
 }
 
 void RealtimeBgmMainJumped(struct RealtimeBgm* b) {
-	if (RealtimeBgmActive(b)) {
+	if (!RealtimeBgmActive(b)) {
+		return;
+	}
+	// A reset lands before m4aSoundInit: no driver would ever start on a clone.
+	if (readChain(b)) {
 		cloneShadows(b);
+	} else if (b->state != FELL_BACK) {
+		finishHandBack(b);
 	}
 }
 

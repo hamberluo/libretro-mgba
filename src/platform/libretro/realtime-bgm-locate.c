@@ -39,8 +39,7 @@ static bool isTerminator(uint16_t op) {
 	return (op & 0xFF87) == 0x4700 /* bx */ || (op & 0xFF00) == 0xBD00 /* pop {..,pc} */ || op == 0x46C0 /* nop pad */;
 }
 
-// Nearest preceding `push {..., lr}` within `range` bytes, extended over gcc's
-// two-push prologue (`push {..,lr}; mov rX, r8-r11...; push {..}`). 0 if none.
+// Nearest `push {..., lr}` above, extended over gcc's two-push prologue. 0 if none.
 static size_t pushAbove(const struct Scan* s, size_t off, size_t range) {
 	size_t p = 0;
 	bool found = false;
@@ -69,11 +68,9 @@ static size_t pushAbove(const struct Scan* s, size_t off, size_t range) {
 
 #define MAX_CANDIDATES 9
 
-// Function entry for the push at `push`: the push itself or an instruction just
-// above it, when gcc scheduled loads ahead of the push. Candidates stop at the
-// previous function's end; the one most BLs land on wins, so a data word that
-// decodes as BL cannot pull the entry into the middle of a function. One pass
-// over the ROM counts every candidate.
+// gcc may schedule loads above the push. Of the candidates back to the previous
+// function's end, the most-called wins, so a data word decoding as BL cannot
+// pull the entry into a function (Boktai).
 static size_t entryOf(const struct Scan* s, size_t push) {
 	size_t cand[MAX_CANDIDATES];
 	unsigned hits[MAX_CANDIDATES] = { 0 };

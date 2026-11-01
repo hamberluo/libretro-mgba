@@ -93,20 +93,12 @@ static void locate_truncated_rom(void) {
 	free(rom);
 }
 
-static void locate_not_m4a(void) {
-	uint8_t* rom = calloc(1, 0x10000);
-	struct RealtimeBgmM4a m;
-	CHECK(RealtimeBgmLocate(rom, 0x10000, &m) == RETRO_BGM_NOT_M4A);
-	free(rom);
-}
-
 int main(void) {
 	locate_agbcc_firered();
 	locate_c_vsync_minish();
 	locate_gcc_heart_and_soul();
 	locate_ignores_fake_bl_boktai();
 	locate_truncated_rom();
-	locate_not_m4a();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-locate: %d failure(s)\n", failures);
 		return 1;

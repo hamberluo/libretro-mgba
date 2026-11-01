@@ -27,8 +27,9 @@
 #include <mgba/internal/gba/gba.h>
 #endif
 #include <mgba-util/memory.h>
-#include <stdatomic.h>
 #include <mgba-util/vfs.h>
+
+#include <stdatomic.h>
 
 #ifndef __LIBRETRO__
 #error "Can't compile the libretro core as anything other than libretro."

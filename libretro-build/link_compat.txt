@@ -62,3 +62,5 @@ d795413520e930fb 3b52706bfa2141f6
 8198dc58cd0be529 3b52706bfa2141f6
 # Driver locks restored on shadows after a clone: shadow-only, as above.
 83a02ea85b381ba9 3b52706bfa2141f6
+# Quality pass: comments, crossfade gains, idle silence past 8x, reset hand-back; shadow-only.
+1bb64ddb8a92314a 3b52706bfa2141f6
