@@ -66,3 +66,5 @@ d795413520e930fb 3b52706bfa2141f6
 1bb64ddb8a92314a 3b52706bfa2141f6
 # Hand-back fade ramps back on a re-press: shadow-only.
 943a1b22cb38d585 3b52706bfa2141f6
+# Shadows boot main's BIOS; the hand-back mix drains main every frame: shadow/output only.
+e02f1e8e5689b78e 3b52706bfa2141f6

@@ -9,12 +9,13 @@
 //   split  warm frames    main at 1x: music lane + effects lane vs main, 0.5 s windows
 //   ff     warm frames N  main at Nx for `frames` 1x frames; status must stay ok
 //   merc   warm           Mercury: 6 s at 4x, release, re-press after 0.5 s, release again
-// env: PRESS (tap A+Start every 1.5 s; PRESS_UNTIL=n stops at main frame n), SHOT=path.wav (write the lane under test),
+// env: BIOS=path (main boots a real BIOS, as on device), PRESS (tap A+Start every 1.5 s; PRESS_UNTIL=n stops at main frame n), SHOT=path.wav (write the lane under test),
 //      NOPSG (split: DirectSound only, as PSG phase alone drags waveform correlation)
 
 #include "../../src/platform/libretro/aux-core.h"
 #include "../../src/platform/libretro/realtime-bgm.h"
 
+#include <mgba/core/config.h>
 #include <mgba/core/core.h>
 #include <mgba/core/log.h>
 #include <mgba/internal/gba/gba.h>
@@ -166,7 +167,15 @@ static void makeMain(void) {
 	mCoreInitConfig(mainCore, NULL);
 	mainCore->init(mainCore);
 	RetroAuxCoreConfigure(mainCore);
+	if (getenv("BIOS")) {
+		mCoreConfigSetIntValue(&mainCore->config, "useBios", 1);
+		mCoreConfigSetIntValue(&mainCore->config, "skipBios", 0);
+		mCoreLoadConfig(mainCore);
+	}
 	mainCore->loadROM(mainCore, VFileFromConstMemory(rom, romSize));
+	if (getenv("BIOS")) {
+		mainCore->loadBIOS(mainCore, VFileOpen(getenv("BIOS"), O_RDONLY), 0);
+	}
 	mainCore->setVideoBuffer(mainCore, video, 256);
 	mainCore->rtc.override = RTC_FIXED;
 	mainCore->rtc.value = wallMs;

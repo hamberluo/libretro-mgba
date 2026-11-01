@@ -29,6 +29,7 @@ enum retro_bgm_status {
 	RETRO_BGM_LOCATE_MPLAY_STOP = 5,
 	RETRO_BGM_CHAIN_INVALID = 6, // fell back this session
 	RETRO_BGM_BUDGET = 7,        // fell back this session
+	RETRO_BGM_CLONE_FAILED = 8,  // fell back this session
 };
 
 // Above this speed only music plays: compressed sound effects are noise.

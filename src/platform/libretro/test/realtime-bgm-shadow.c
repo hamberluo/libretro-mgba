@@ -8,6 +8,7 @@
 #include "realtime-bgm-rom.h"
 
 #include <mgba/core/core.h>
+#include <mgba/internal/gba/gba.h>
 #include <mgba-util/audio-buffer.h>
 #include <mgba-util/vfs.h>
 
@@ -252,6 +253,57 @@ static void repress_mid_fade_ramps_back(void) {
 	RetroAuxCoreDestroy(core);
 }
 
+// A main core running a real BIOS (devices with one imported) saves states
+// mGBA refuses to load into a core with another BIOS while the PC is inside
+// it, which is where a game waiting for VBlank sits: the shadows must run the
+// same BIOS, or every clone fails and they play nothing.
+static void shadows_run_mains_bios(void) {
+	static uint8_t bios[0x4000];
+	for (int i = 0; i < 7; ++i) {
+		bios[i * 4 + 3] = 0xEA; // b, as GBAIsBIOS wants
+	}
+	bios[0x100] = 0x5A;
+	struct mCore* core = mainCore();
+	core->loadBIOS(core, VFileFromConstMemory(bios, sizeof(bios)), 0);
+	struct RealtimeBgm* bgm = create(core, bgmStubs());
+	soundInit(core);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	CHECK(RealtimeBgmActive(bgm));
+	for (int sfx = 0; sfx < 2; ++sfx) {
+		struct GBA* shadow = RealtimeBgmShadowForTesting(bgm, sfx)->board;
+		CHECK(shadow->memory.fullBios);
+		CHECK(shadow->biosChecksum == ((struct GBA*) core->board)->biosChecksum);
+	}
+	RealtimeBgmDestroy(bgm);
+	RetroAuxCoreDestroy(core);
+}
+
+// The hand-back mix consumes main's whole frame even when the effects shadow
+// produced less (a different sample rate): leftovers piled up for the length
+// of the fade and then went out in one batch, past libretro.c's buffer.
+static void fade_consumes_all_of_main(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgm* bgm = create(core, bgmStubs());
+	soundInit(core);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	RealtimeBgmSetSpeed(bgm, 1, true);
+	RealtimeBgmRun(bgm, 1 + CROSSFADE_FRAMES / 2);
+	mainFrames(core, bgm, 1);
+	struct mAudioBuffer* fx = RealtimeBgmShadowForTesting(bgm, true)->getAudioBuffer(RealtimeBgmShadowForTesting(bgm, true));
+	size_t fxFrames = mAudioBufferAvailable(fx);
+	struct mAudioBuffer main;
+	mAudioBufferInit(&main, 0x1000, 2);
+	static int16_t loud[0x1000 * 2];
+	size_t mainFrames = fxFrames + 500;
+	mAudioBufferWrite(&main, loud, mainFrames);
+	struct mAudioBuffer* out = RealtimeBgmGameAudio(bgm, &main);
+	CHECK(mAudioBufferAvailable(&main) == 0);
+	CHECK(mAudioBufferAvailable(out) == mainFrames);
+	mAudioBufferDeinit(&main);
+	RealtimeBgmDestroy(bgm);
+	RetroAuxCoreDestroy(core);
+}
+
 // Unloading mid hand-back frees both shadows (ASan reports a leak or a UAF).
 static void destroy_mid_handback(void) {
 	struct mCore* core = mainCore();
@@ -280,6 +332,8 @@ int main(void) {
 	clone_releases_driver_locks();
 	idle_past_8x_is_silent();
 	repress_mid_fade_ramps_back();
+	shadows_run_mains_bios();
+	fade_consumes_all_of_main();
 	destroy_mid_handback();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-shadow: %d failure(s)\n", failures);

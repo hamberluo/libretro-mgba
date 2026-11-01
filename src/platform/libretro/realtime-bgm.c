@@ -182,6 +182,11 @@ static bool shadowCreate(struct RealtimeBgm* b, struct Shadow* s) {
 		s->core = NULL;
 		return false;
 	}
+	// mGBA refuses a state saved under a real BIOS while the PC is inside it
+	// (a game waiting for VBlank) unless the loading core runs the same BIOS.
+	if (b->mainGba->memory.fullBios) {
+		s->core->loadBIOS(s->core, VFileFromConstMemory(b->mainGba->memory.bios, GBA_SIZE_BIOS), 0);
+	}
 	// Before reset: that is when a core picks its renderer.
 	s->video = calloc(256 * 224, sizeof(mColor));
 	s->core->setVideoBuffer(s->core, s->video, 256);
@@ -204,12 +209,15 @@ static void shadowDestroy(struct Shadow* s) {
 }
 
 // Parked: only our calls may wake it.
-static void shadowClone(struct RealtimeBgm* b, struct Shadow* s) {
+static bool shadowClone(struct RealtimeBgm* b, struct Shadow* s) {
 	size_t size = b->main->stateSize(b->main);
 	void* state = malloc(size);
 	b->main->saveState(b->main, state);
-	s->core->loadState(s->core, state);
+	bool loaded = s->core->loadState(s->core, state);
 	free(state);
+	if (!loaded) {
+		return false;
+	}
 	struct ARMCore* cpu = s->gba->cpu;
 	// Free below SP by the ABI, and game code never runs here again.
 	ARMSetPrivilegeMode(cpu, MODE_SYSTEM);
@@ -219,6 +227,7 @@ static void shadowClone(struct RealtimeBgm* b, struct Shadow* s) {
 	GBAHalt(s->gba);
 	s->gba->audio.masterVolume = b->mainGba->audio.masterVolume;
 	mAudioBufferClear(s->core->getAudioBuffer(s->core));
+	return true;
 }
 
 // False if the call ran past the budget.
@@ -400,13 +409,17 @@ static void releaseDriverLocks(struct RealtimeBgm* b, struct Shadow* s) {
 	}
 }
 
-static void cloneShadows(struct RealtimeBgm* b) {
-	shadowClone(b, &b->bgm);
-	shadowClone(b, &b->sfx);
+// False after falling back: a shadow that kept its own state plays nothing.
+static bool cloneShadows(struct RealtimeBgm* b) {
+	if (!shadowClone(b, &b->bgm) || !shadowClone(b, &b->sfx)) {
+		fallBack(b, RETRO_BGM_CLONE_FAILED);
+		return false;
+	}
 	releaseDriverLocks(b, &b->bgm);
 	releaseDriverLocks(b, &b->sfx);
 	mAudioBufferClear(&b->bgmOut);
 	++clones;
+	return true;
 }
 
 static void takeOver(struct RealtimeBgm* b) {
@@ -421,8 +434,9 @@ static void takeOver(struct RealtimeBgm* b) {
 	}
 	b->sfx.sfx = true;
 	// Untouched: each shadow's first sync stops what is not its own.
-	cloneShadows(b);
-	b->state = ACTIVE;
+	if (cloneShadows(b)) {
+		b->state = ACTIVE;
+	}
 }
 
 static void finishHandBack(struct RealtimeBgm* b) {
@@ -589,16 +603,16 @@ struct mAudioBuffer* RealtimeBgmGameAudio(struct RealtimeBgm* b, struct mAudioBu
 		// fall through: a fade may still be ramping back
 	case HANDING_BACK:
 		if (b->fadeFrames > 0) {
+			// Main sets the length: a leftover would pile up for the whole fade.
 			struct mAudioBuffer* fx = b->sfx.core->getAudioBuffer(b->sfx.core);
 			size_t n = mAudioBufferAvailable(mainBuffer);
-			if (mAudioBufferAvailable(fx) < n) {
-				n = mAudioBufferAvailable(fx);
-			}
 			if (n > LANE_FRAMES) {
 				n = LANE_FRAMES;
 			}
 			mAudioBufferRead(mainBuffer, b->mixA, n);
-			mAudioBufferRead(fx, b->mixB, n);
+			mAudioBufferClear(mainBuffer);
+			size_t got = mAudioBufferRead(fx, b->mixB, n);
+			memset(b->mixB + got * 2, 0, (n - got) * 4);
 			// Equal power against the uncorrelated music lane; the effects in main
 			// and in the shadow are in phase, so theirs sum to one.
 			double mainGain = sin(fadeAngle(b)), shadowGain = 1 - mainGain;
