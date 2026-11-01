@@ -15,7 +15,7 @@ mkdir -p "$BUILD_DIR"
 	-DRESAMPLE_LIBRARY=2 -DM_PI=3.14159265358979323846 -DMGBA_STANDALONE -DPATH_MAX=1024 \
 	-DHAVE_LOCALE -DHAVE_XLOCALE -DHAVE_STRTOF_L -Iinclude -Isrc -I. \
 	-o "$BUILD_DIR/bgm-smoke" libretro-build/tools/bgm-smoke.c src/gba/test/core-deinit-stubs.c \
-	src/platform/libretro/aux-core.c src/platform/libretro/realtime-bgm.c src/platform/libretro/realtime-bgm-locate.c \
+	src/platform/libretro/aux-core.c src/platform/libretro/realtime-bgm.c src/platform/libretro/realtime-bgm-m4a.c src/platform/libretro/realtime-bgm-locate.c \
 	src/core/*.c src/gba/*.c src/gba/renderers/*.c src/gba/cheats/*.c \
 	src/gba/cart/*.c src/gba/sio/*.c src/arm/*.c src/gb/*.c src/gb/mbc/*.c src/gb/sio/*.c \
 	src/gb/renderers/*.c src/sm83/*.c src/util/*.c src/util/vfs/vfs-file.c src/util/vfs/vfs-mem.c -lm)

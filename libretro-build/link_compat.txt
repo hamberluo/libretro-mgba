@@ -76,3 +76,5 @@ c7d6f2df18e80730 3b52706bfa2141f6
 95c148ae3534ea1d 3b52706bfa2141f6
 # Long non-looping songs count as music: shadow-only.
 19f637ad39cde591 3b52706bfa2141f6
+# realtime-bgm engine split: pure move.
+53bf702f38992e65 3b52706bfa2141f6

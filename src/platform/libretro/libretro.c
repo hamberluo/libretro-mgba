@@ -49,6 +49,7 @@ FS_Archive sdmcArchive;
 #include "libretro_link.h"
 #include "libretro_rewind.h"
 #include "realtime-bgm.h"
+#include "realtime-bgm-engine.h"
 #include "rewind.h"
 #include "link.h"
 
@@ -1458,7 +1459,10 @@ static void _realtimeBgmLoad(void) {
 		struct RealtimeBgmM4a m4a;
 		status = RealtimeBgmLocate((const uint8_t*) gba->memory.rom, gba->memory.romSize, &m4a);
 		if (status == RETRO_BGM_OK) {
-			realtimeBgm = RealtimeBgmCreate(core, gba->memory.rom, gba->memory.romSize, &m4a, targetSampleRate);
+			struct RealtimeBgmEngine engine;
+			if (RealtimeBgmM4aEngine(core, gba->memory.rom, gba->memory.romSize, &m4a, &engine)) {
+				realtimeBgm = RealtimeBgmCreate(core, gba->memory.rom, gba->memory.romSize, &engine, targetSampleRate);
+			}
 			if (!realtimeBgm) {
 				status = RETRO_BGM_NOT_M4A;
 			}

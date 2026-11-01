@@ -29,14 +29,20 @@ bool RealtimeBgmSongIsMusic(RealtimeBgmRead8 read8, void* ctx, uint32_t songHead
 
 struct mCore;
 struct mAudioBuffer;
+struct RealtimeBgmEngine;
+
+// The m4a adapter; `rom` must outlive it.
+bool RealtimeBgmM4aEngine(struct mCore* main, const void* rom, size_t romSize, const struct RealtimeBgmM4a* m4a,
+                          struct RealtimeBgmEngine* out);
 
 // Two parked shadow cores cloned from main: music at 1x wall time, effects in
 // lockstep with main. Emulation thread only.
 struct RealtimeBgm;
 
 // The shadows map `rom` without copying it: destroy this before freeing it.
+// Takes ownership of `engine->state`, failure included.
 struct RealtimeBgm* RealtimeBgmCreate(struct mCore* main, const void* rom, size_t romSize,
-                                      const struct RealtimeBgmM4a* m4a, unsigned outRate);
+                                      const struct RealtimeBgmEngine* engine, unsigned outRate);
 void RealtimeBgmDestroy(struct RealtimeBgm*);
 
 void RealtimeBgmAfterMainFrame(struct RealtimeBgm*);

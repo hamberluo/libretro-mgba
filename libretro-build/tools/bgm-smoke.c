@@ -14,6 +14,7 @@
 
 #include "../../src/platform/libretro/aux-core.h"
 #include "../../src/platform/libretro/realtime-bgm.h"
+#include "../../src/platform/libretro/realtime-bgm-engine.h"
 
 #include <mgba/core/config.h>
 #include <mgba/core/core.h>
@@ -354,7 +355,9 @@ int main(int argc, char** argv) {
 		return status == RETRO_BGM_OK ? 0 : 1;
 	}
 	makeMain();
-	bgm = RealtimeBgmCreate(mainCore, rom, romSize, &m4a, RATE);
+	struct RealtimeBgmEngine engine;
+	RealtimeBgmM4aEngine(mainCore, rom, romSize, &m4a, &engine);
+	bgm = RealtimeBgmCreate(mainCore, rom, romSize, &engine, RATE);
 	int warm = argc > 3 ? atoi(argv[3]) : 600;
 	int frames = argc > 4 ? atoi(argv[4]) : 600;
 	int rc = 2;

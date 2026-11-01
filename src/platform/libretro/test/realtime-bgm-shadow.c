@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include "../aux-core.h"
 #include "../realtime-bgm.h"
+#include "../realtime-bgm-engine.h"
 #include "realtime-bgm-rom.h"
 
 #include <mgba/core/core.h>
@@ -65,7 +66,9 @@ static void mainFrames(struct mCore* core, struct RealtimeBgm* bgm, int n) {
 }
 
 static struct RealtimeBgm* create(struct mCore* core, struct RealtimeBgmM4a m) {
-	return RealtimeBgmCreate(core, rom, sizeof(rom), &m, 65536);
+	struct RealtimeBgmEngine engine;
+	RealtimeBgmM4aEngine(core, rom, sizeof(rom), &m, &engine);
+	return RealtimeBgmCreate(core, rom, sizeof(rom), &engine, 65536);
 }
 
 // Fast-forward held from the boot logo, before m4aSoundInit: take over once
