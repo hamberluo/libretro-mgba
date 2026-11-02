@@ -21,6 +21,14 @@ cd "$SCRIPT_DIR"
 # 路径：libretro-build -> mgba-master -> gba 根目录 -> go_gba
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../go_gba" && pwd)"
 
+# An unmapped source hash ships a new link id: LAN play with released builds
+# breaks silently. NEW_LINK_ID=1 when that is the intent (same-day release).
+LINK_ID="$(sh "$SCRIPT_DIR/link_core_id.sh" "$SCRIPT_DIR/..")"
+if [ -z "$NEW_LINK_ID" ] && ! awk '$1 !~ /^#/ { print $2 }' "$SCRIPT_DIR/link_compat.txt" | grep -qx "$LINK_ID"; then
+    echo -e "${RED}link id $LINK_ID is not a shipped one: map it in link_compat.txt or pass NEW_LINK_ID=1${NC}"
+    exit 1
+fi
+
 # 构建输出目录
 BUILD_DIR="$SCRIPT_DIR/libs"
 # 未 strip(带 debug_info)的产物目录，用于给 Crashlytics 做 native 符号化
