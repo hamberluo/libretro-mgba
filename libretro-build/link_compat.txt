@@ -88,3 +88,5 @@ ad5621e99a5ef60d 3b52706bfa2141f6
 1240bbb822e829b6 3b52706bfa2141f6
 # Pokémon GB shadows follow main's options byte and wave RAM: shadow-only.
 ee4b74cca0eaebd2 3b52706bfa2141f6
+# Shadows run the frame after the driver call: shadow-only.
+ce1797464c7c9e6a 3b52706bfa2141f6
