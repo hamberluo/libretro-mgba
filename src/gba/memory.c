@@ -147,7 +147,8 @@ void GBAMemoryReset(struct GBA* gba) {
 		gba->isPristine = false;
 	}
 
-	if (gba->memory.hw.devices & HW_GPIO) {
+	// The copy only gives the GPIO registers somewhere to live.
+	if ((gba->memory.hw.devices & HW_GPIO) && gba->memory.hw.gpioBase) {
 		_pristineCow(gba);
 	}
 

@@ -70,6 +70,11 @@ static bool shadowCreate(struct RealtimeBgm* b, struct RealtimeBgmShadow* s) {
 		s->core = NULL;
 		return false;
 	}
+	if (b->main->platform(b->main) == mPLATFORM_GBA) {
+		// Shadows never drive cart hardware, so a GPIO cart shares main's ROM
+		// instead of copying it per shadow.
+		((struct GBA*) s->core->board)->memory.hw.gpioBase = NULL;
+	}
 	// mGBA refuses a state saved under a real BIOS while the PC is inside it
 	// (a game waiting for VBlank) unless the loading core runs the same BIOS.
 	struct GBA* mainGba = b->main->board;

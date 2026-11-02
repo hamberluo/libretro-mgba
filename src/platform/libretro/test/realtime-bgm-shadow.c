@@ -15,6 +15,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static int failures;
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "%s:%d: CHECK(%s)\n", __FILE__, __LINE__, #c); ++failures; } } while (0)
@@ -398,6 +399,27 @@ static void destroy_mid_handback(void) {
 	RetroAuxCoreDestroy(core);
 }
 
+// A GPIO cart (Ruby's RTC) made each shadow copy the whole ROM at reset and
+// keep it for the session.
+static void gpio_cart_shadows_share_rom(void) {
+	uint8_t id[4];
+	memcpy(id, &rom[0xAC], 4);
+	memcpy(&rom[0xAC], "AXVE", 4);
+	struct mCore* core = mainCore();
+	CHECK(((struct GBA*) core->board)->memory.hw.devices & HW_RTC);
+	struct RealtimeBgm* bgm = create(core, bgmStubs());
+	soundInit(core);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	CHECK(RealtimeBgmActive(bgm));
+	for (int sfx = 0; sfx < 2; ++sfx) {
+		struct GBA* shadow = RealtimeBgmShadowForTesting(bgm, sfx)->board;
+		CHECK((void*) shadow->memory.rom == rom);
+	}
+	RealtimeBgmDestroy(bgm);
+	RetroAuxCoreDestroy(core);
+	memcpy(&rom[0xAC], id, 4);
+}
+
 int main(void) {
 	bgmBuildRom(rom);
 	takeover_waits_for_sound_init();
@@ -415,6 +437,7 @@ int main(void) {
 	finished_effect_is_not_replayed();
 	many_track_song_is_music();
 	destroy_mid_handback();
+	gpio_cart_shadows_share_rom();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-shadow: %d failure(s)\n", failures);
 		return 1;
