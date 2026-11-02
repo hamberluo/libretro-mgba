@@ -34,7 +34,7 @@ static uint8_t* rom(const struct GbFixture* f, size_t size) {
 	return r;
 }
 
-static void gen2(const char* name, uint16_t entry, uint16_t mp, uint8_t len, uint8_t flags) {
+static void gen2(const char* name, uint16_t entry, uint16_t mp, uint8_t len, uint8_t flags, uint16_t options) {
 	const struct GbFixture* f = fixture(name);
 	uint8_t* r = rom(f, 0);
 	struct RealtimeBgmGb gb;
@@ -45,19 +45,20 @@ static void gen2(const char* name, uint16_t entry, uint16_t mp, uint8_t len, uin
 	CHECK(gb.musicPlaying == mp);
 	CHECK(gb.channelLength == len);
 	CHECK(gb.channelFlags == flags);
+	CHECK(gb.options == options);
 	free(r);
 }
 
 static void gen2_crystal(void) {
-	gen2("crystal", 0x405C, 0xC100, 0x32, 3);
+	gen2("crystal", 0x405C, 0xC100, 0x32, 3, 0xCFCC);
 }
 
 static void gen2_polished(void) {
-	gen2("polished", 0x40F1, 0xCB7E, 0x24, 7);
+	gen2("polished", 0x40F1, 0xCB7E, 0x24, 7, 0xCFF1);
 }
 
 static void gen2_prism(void) {
-	gen2("prism", 0x4051, 0xC100, 0x32, 3);
+	gen2("prism", 0x4051, 0xC100, 0x32, 3, 0xCFCC);
 }
 
 static void gen1_red(void) {

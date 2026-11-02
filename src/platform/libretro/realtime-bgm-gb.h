@@ -23,6 +23,7 @@ struct RealtimeBgmGb {
 	uint16_t musicPlaying;   // gen2: wMusicPlaying; wChannel1 = musicPlaying + 1
 	uint8_t channelLength;   // gen2: 0x32 (Polished 0x24)
 	uint8_t channelFlags;    // gen2: on flag offset, bit 0 (Polished 7)
+	uint16_t options;        // gen2: wOptions, whose stereo bit the engine tests; 0 = none found
 	uint16_t soundIds;       // gen1: wChannelSoundIDs
 	uint16_t updateMusic[256]; // gen1: UpdateMusic per ROM bank, 0 = none
 };

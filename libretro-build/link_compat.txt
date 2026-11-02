@@ -86,3 +86,5 @@ dcef45538aa25f46 3b52706bfa2141f6
 ad5621e99a5ef60d 3b52706bfa2141f6
 # Review fixes for Pokémon GB realtime BGM: shadow-only.
 1240bbb822e829b6 3b52706bfa2141f6
+# Pokémon GB shadows follow main's options byte and wave RAM: shadow-only.
+ee4b74cca0eaebd2 3b52706bfa2141f6

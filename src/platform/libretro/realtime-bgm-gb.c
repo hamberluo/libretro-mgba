@@ -100,6 +100,9 @@ static void copySoundRam(const struct Gb* e, const struct RealtimeBgmShadow* s) 
 	for (uint32_t a = from; a < to; ++a) {
 		wr(gbOf(s), a, rd(e->mainGb, a));
 	}
+	// Engines that remember the loaded waveform (Polished's wCh3LoadedWaveform)
+	// skip the reload: the wave must come with that record.
+	memcpy(gbOf(s)->audio.ch3.wavedata8, e->mainGb->audio.ch3.wavedata8, sizeof(e->mainGb->audio.ch3.wavedata8));
 }
 
 // The music shadow follows main's music channels; the effects shadow, effects
@@ -194,6 +197,10 @@ static void cloned(void* state, struct RealtimeBgmShadow* s) {
 // After a sync main has already ticked the copied state this frame.
 static bool frame(void* state, struct RealtimeBgmShadow* s) {
 	struct Gb* e = state;
+	// Loaded from the save after a boot clone.
+	if (e->gb.options) {
+		wr(gbOf(s), e->gb.options, rd(e->mainGb, e->gb.options));
+	}
 	bool sync = mainChanged(e, s);
 	if (sync) {
 		copySoundRam(e, s);

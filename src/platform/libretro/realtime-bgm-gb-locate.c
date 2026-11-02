@@ -38,6 +38,26 @@ static int ldHlAddBc(const uint8_t* p, size_t avail, uint8_t t0, uint8_t t1) {
 	return p[1];
 }
 
+// `ld a,[n]; bit b,a` anywhere in the engine's bank on a WRAM byte outside
+// the copied block: the options byte (stereo). 0 if none, or if they disagree.
+static uint16_t gen2Options(const uint8_t* rom, size_t romSize, size_t bank, uint16_t from, uint16_t to) {
+	uint16_t found = 0;
+	size_t end = (bank + 1) * BANK_SIZE < romSize ? (bank + 1) * BANK_SIZE : romSize;
+	for (size_t a = bank * BANK_SIZE; a + 5 <= end; ++a) {
+		const uint8_t* p = rom + a;
+		uint16_t n = le16(p + 1);
+		if (p[0] != 0xFA || p[3] != 0xCB || (p[4] & 0xC7) != 0x47 || n < WRAM_BASE || n >= WRAM_END ||
+		    (n >= from && n < to)) {
+			continue;
+		}
+		if (found && found != n) {
+			return 0;
+		}
+		found = n;
+	}
+	return found;
+}
+
 // _UpdateSound: ld a,[wMusicPlaying]; and a; ret z; xor a; ld [..],a; ld [..],a;
 // ld bc,wChannel1, with wChannel1 right after wMusicPlaying. The channel struct
 // layout is read from the code that walks it: hacks move and resize it.
@@ -61,6 +81,7 @@ static bool gen2At(const uint8_t* rom, size_t romSize, size_t o, struct Realtime
 	    mp + 1 + 8 * length + REALTIME_BGM_GB2_GLOBALS > WRAM_END) {
 		return false;
 	}
+	uint16_t blockEnd = mp + 1 + 8 * length + REALTIME_BGM_GB2_GLOBALS;
 	*out = (struct RealtimeBgmGb) {
 		.family = REALTIME_BGM_GB_GEN2,
 		.updateBank = o / BANK_SIZE,
@@ -68,6 +89,7 @@ static bool gen2At(const uint8_t* rom, size_t romSize, size_t o, struct Realtime
 		.musicPlaying = mp,
 		.channelLength = length,
 		.channelFlags = flags,
+		.options = gen2Options(rom, romSize, o / BANK_SIZE, mp, blockEnd),
 	};
 	return true;
 }

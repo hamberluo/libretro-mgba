@@ -4,7 +4,7 @@
 Each fixture keeps only what the locator reads: the m4a functions with their
 literal pools, and every Thumb BL in the ROM that lands in them (the entry rule
 counts callers); for Pokémon GB, the head of gen2's _UpdateSound and each copy
-of gen1's UpdateMusic signature. The test pastes these back at their offsets
+of gen1's UpdateMusic signature, and gen2's bit tests on WRAM bytes. The test pastes these back at their offsets
 into a zero ROM.
 usage: bgm-fixtures.py <rom dir> > realtime-bgm-fixtures.h
 """
@@ -47,7 +47,12 @@ GEN1_TAIL = bytes([0x09, 0x7E, 0xA7])
 
 def gb_slices(rom, entry):
     if entry is not None:
-        return [(entry, entry + 0xB0)]
+        # Plus every `ld a,[n]; bit b,a` in the bank: where the options byte is found.
+        bank = entry // 0x4000 * 0x4000
+        tests = [(a, a + 5) for a in range(bank, bank + 0x4000 - 5)
+                 if rom[a] == 0xFA and rom[a + 3] == 0xCB and rom[a + 4] & 0xC7 == 0x47
+                 and not entry <= a < entry + 0xB0]
+        return [(entry, entry + 0xB0)] + tests
     return [(o, o + 10) for o in range(0x4000, len(rom) - 10)
             if rom[o:o + 5] == GEN1_HEAD and rom[o + 7:o + 10] == GEN1_TAIL]
 

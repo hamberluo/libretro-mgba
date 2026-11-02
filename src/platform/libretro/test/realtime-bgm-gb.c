@@ -222,6 +222,32 @@ static void nr50_mirrored(void) {
 	done(bgm, core);
 }
 
+// Polished caches the loaded waveform: a sync that copies the record must
+// bring the wave, or the shadow keeps the boot ROM's pattern.
+static void sync_brings_wave(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgm* bgm = create(core, gen2());
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	((struct GB*) core->board)->audio.ch3.wavedata8[0] = 0x13;
+	channelOn(core, 0, 0x10);
+	RealtimeBgmRun(bgm, 1);
+	CHECK(((struct GB*) shadow(bgm, false)->board)->audio.ch3.wavedata8[0] == 0x13);
+	done(bgm, core);
+}
+
+// Options load from the save after a clone at boot.
+static void options_mirrored(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgmGb gb = gen2();
+	gb.options = 0xCFCC;
+	struct RealtimeBgm* bgm = create(core, gb);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	core->busWrite8(core, 0xCFCC, 0x40);
+	RealtimeBgmRun(bgm, 1);
+	CHECK(shadow(bgm, false)->busRead8(shadow(bgm, false), 0xCFCC) == 0x40);
+	done(bgm, core);
+}
+
 // gen1's map-change fade lives in home code no shadow runs: cloned mid-fade,
 // the effects shadow kept main's near-silent master volume for the whole press.
 static void effects_follow_main_volume(void) {
@@ -266,6 +292,8 @@ int main(void) {
 	nr50_mirrored();
 	effects_follow_main_volume();
 	sp_outside_ram_waits();
+	sync_brings_wave();
+	options_mirrored();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-gb: %d failure(s)\n", failures);
 		return 1;
