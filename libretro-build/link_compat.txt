@@ -90,3 +90,6 @@ ad5621e99a5ef60d 3b52706bfa2141f6
 ee4b74cca0eaebd2 3b52706bfa2141f6
 # Shadows run the frame after the driver call: shadow-only.
 ce1797464c7c9e6a 3b52706bfa2141f6
+# Reset copies the ROM only with a GPIO base: link cores always have one (a
+# multicart clears it but is never pristine), so 2P frames are untouched.
+1416f5616eceff1d 3b52706bfa2141f6
