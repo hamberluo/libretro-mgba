@@ -247,7 +247,9 @@ void RealtimeBgmAfterMainFrame(struct RealtimeBgm* b) {
 	}
 	if (!b->engine.frame(b->engine.state, &b->sfx)) {
 		fallBack(b, RETRO_BGM_BUDGET);
+		return;
 	}
+	b->sfx.core->runFrame(b->sfx.core);
 }
 
 void RealtimeBgmRun(struct RealtimeBgm* b, unsigned frames) {
@@ -256,6 +258,7 @@ void RealtimeBgmRun(struct RealtimeBgm* b, unsigned frames) {
 			fallBack(b, RETRO_BGM_BUDGET);
 			return;
 		}
+		b->bgm.core->runFrame(b->bgm.core);
 		struct mAudioBuffer* out = b->bgm.core->getAudioBuffer(b->bgm.core);
 		mAudioResamplerSetSource(&b->bgmResampler, out, b->bgm.core->audioSampleRate(b->bgm.core), true);
 		mAudioResamplerProcess(&b->bgmResampler);

@@ -194,6 +194,32 @@ static void budget_falls_back(void) {
 	done(bgm, core);
 }
 
+// However long the engine runs, each 1x frame hands the lane one frame of
+// samples: a jittery lane underruns the frontend's queue (pops).
+static void music_lane_steady_when_engine_cost_varies(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgmGb gb = gen2();
+	gb.updateSound = GB_STUB_SLOW;
+	struct RealtimeBgm* bgm = create(core, gb);
+	channelOn(core, 0, 0x10);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	static int16_t pcm[4096 * 2];
+	size_t lo = SIZE_MAX, hi = 0;
+	for (int f = 0; f < 20; ++f) {
+		RealtimeBgmRun(bgm, 1);
+		size_t frames = 0, n;
+		while ((n = RealtimeBgmRead(bgm, pcm, 4096)) > 0) {
+			frames += n;
+		}
+		if (f >= 2) { // past the clone's sync frame
+			lo = frames < lo ? frames : lo;
+			hi = frames > hi ? frames : hi;
+		}
+	}
+	CHECK(hi - lo <= 32); // the core's sample batching, nothing more
+	done(bgm, core);
+}
+
 // The boot ROM covers bank 0 until the game writes FF50: no engine to call yet.
 static void boot_rom_not_ready(void) {
 	struct mCore* core = mainCore();
@@ -288,6 +314,7 @@ int main(void) {
 	gen1_drum_is_music();
 	gen1_unknown_bank_skips();
 	budget_falls_back();
+	music_lane_steady_when_engine_cost_varies();
 	boot_rom_not_ready();
 	nr50_mirrored();
 	effects_follow_main_volume();

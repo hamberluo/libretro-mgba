@@ -201,13 +201,10 @@ static bool frame(void* state, struct RealtimeBgmShadow* s) {
 	if (e->gb.options) {
 		wr(gbOf(s), e->gb.options, rd(e->mainGb, e->gb.options));
 	}
-	bool sync = mainChanged(e, s);
-	if (sync) {
+	if (mainChanged(e, s)) {
 		copySoundRam(e, s);
 		keepOwnChannels(e, s);
-	}
-	s->core->runFrame(s->core);
-	if (!sync && !callEngine(e, s)) {
+	} else if (!callEngine(e, s)) {
 		return false;
 	}
 	// Shadows never run home code, where gen1 sets the master volume (its map

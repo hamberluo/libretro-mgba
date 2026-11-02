@@ -278,11 +278,7 @@ static bool frame(void* state, struct RealtimeBgmShadow* s) {
 			return false;
 		}
 	}
-	if (!shadowCall(m, s, m->m4a.soundVSync, 0, 0) || !shadowCall(m, s, m->m4a.soundMain, 0, 0)) {
-		return false;
-	}
-	s->core->runFrame(s->core);
-	return true;
+	return shadowCall(m, s, m->m4a.soundVSync, 0, 0) && shadowCall(m, s, m->m4a.soundMain, 0, 0);
 }
 
 // False to retry on the next press: before m4aSoundInit there is no chain.

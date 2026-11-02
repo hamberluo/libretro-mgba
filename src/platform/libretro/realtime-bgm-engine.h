@@ -32,7 +32,8 @@ struct RealtimeBgmEngine {
 	bool (*ready)(void* state, enum retro_bgm_status* fail);
 	/// Just loaded main's state: park the CPU, release locks, silence what main left sounding.
 	void (*cloned)(void* state, struct RealtimeBgmShadow*);
-	/// One shadow frame: sync from main, call the driver, run the frame. False past the budget.
+	/// Sync from main and call the driver; realtime-bgm.c then runs the frame, so the
+	/// call's time stays inside it and every frame yields one frame of samples. False past the budget.
 	bool (*frame)(void* state, struct RealtimeBgmShadow*);
 	/// The hand-back may start fading.
 	bool (*settled)(void* state, const struct RealtimeBgmShadow* bgm, const struct RealtimeBgmShadow* sfx);
