@@ -168,13 +168,13 @@ static void makeMain(void) {
 	mCoreInitConfig(mainCore, NULL);
 	mainCore->init(mainCore);
 	RetroAuxCoreConfigure(mainCore);
-	if (getenv("BIOS")) {
+	if (getenv("BIOS") && *getenv("BIOS")) {
 		mCoreConfigSetIntValue(&mainCore->config, "useBios", 1);
 		mCoreConfigSetIntValue(&mainCore->config, "skipBios", 0);
 		mCoreLoadConfig(mainCore);
 	}
 	mainCore->loadROM(mainCore, VFileFromConstMemory(rom, romSize));
-	if (getenv("BIOS")) {
+	if (getenv("BIOS") && *getenv("BIOS")) {
 		mainCore->loadBIOS(mainCore, VFileOpen(getenv("BIOS"), O_RDONLY), 0);
 	}
 	mainCore->setVideoBuffer(mainCore, video, 256);

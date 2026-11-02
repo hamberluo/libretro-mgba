@@ -3,7 +3,8 @@
 # mode over the developer's own ROMs (never committed), each with its tool.
 # usage: ./run_bgm_smoke.sh <mode> [warm frames speed]
 #   BUILD_ONLY=1 only builds libretro-build/test-build/bgm-smoke{,-gb}.
-#   ROM_DIR overrides ~/Documents/game; other knobs are the tools' env vars.
+#   ROM_DIR overrides ~/Documents/game; BIOS defaults to its <platform>/<platform>_bios.bin
+#   (BIOS= runs without); other knobs are the tools' env vars.
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -28,8 +29,9 @@ build bgm-smoke-gb.c bgm-smoke-gb
 mode="${1:-find}"
 shift || true
 find "$ROM_DIR" \( -name '*.gba' -o -name '*.gb' -o -name '*.gbc' \) | LC_ALL=C sort | while IFS= read -r rom; do
-	tool=bgm-smoke
-	case "$rom" in *.gb|*.gbc) tool=bgm-smoke-gb ;; esac
+	tool=bgm-smoke bios=gba/gba_bios.bin
+	case "$rom" in *.gb) tool=bgm-smoke-gb bios=gb/gb_bios.bin ;; *.gbc) tool=bgm-smoke-gb bios=gbc/gbc_bios.bin ;; esac
 	printf '%s: ' "$(basename "$rom")"
-	"$BUILD_DIR/$tool" "$rom" "$mode" "$@" | head -1
+	# Devices boot the real BIOS: bugs hid where the smoke skipped it.
+	BIOS="${BIOS-$ROM_DIR/$bios}" "$BUILD_DIR/$tool" "$rom" "$mode" "$@" | head -1
 done

@@ -8,7 +8,7 @@
 //   gbmusic warm frames N   main at Nx; music shadow vs a 1x reference, on frames with no effect
 //   gbsfx   warm frames     lockstep; effects shadow vs main, per hardware channel an effect owns
 //   ff      warm frames N   main at Nx; status must stay ok, both lanes audible
-// env: PRESS (A / Start / Down held 6 frames every 40), GB_MODEL=DMG|SGB|CGB,
+// env: PRESS (A / Start / Down held 6 frames every 40), GB_MODEL=DMG|SGB|CGB, BIOS=boot ROM,
 //      DIFF=n (gbmusic: print the first n differing frames)
 
 #include "../../src/platform/libretro/aux-core.h"
@@ -54,6 +54,11 @@ static struct mCore* makeCore(void) {
 		mCoreLoadConfig(c);
 	}
 	c->loadROM(c, VFileFromConstMemory(rom, romSize));
+	if (getenv("BIOS") && *getenv("BIOS")) {
+		c->loadBIOS(c, VFileOpen(getenv("BIOS"), O_RDONLY), 0);
+		mCoreConfigSetValue(&c->config, "skipBios", "0");
+		mCoreLoadConfig(c);
+	}
 	c->setVideoBuffer(c, video, 256);
 	c->reset(c);
 	RetroAuxCoreNeverDraw(c);
