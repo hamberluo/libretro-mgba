@@ -1461,8 +1461,18 @@ static void _realtimeBgmLoad(void) {
 	if (core->platform(core) == mPLATFORM_GBA) {
 		struct GBA* gba = core->board;
 		struct RealtimeBgmM4a m4a;
+		struct RealtimeBgmStream stream;
 		status = RealtimeBgmLocate((const uint8_t*) gba->memory.rom, gba->memory.romSize, &m4a);
-		if (status == RETRO_BGM_OK) {
+		if (status != RETRO_BGM_OK && RealtimeBgmStreamLocate((const uint8_t*) gba->memory.rom, gba->memory.romSize, &stream)) {
+			struct RealtimeBgmEngine engine;
+			status = RETRO_BGM_OK;
+			if (RealtimeBgmStreamEngine(core, &stream, &engine)) {
+				realtimeBgm = RealtimeBgmCreate(core, gba->memory.rom, gba->memory.romSize, &engine, targetSampleRate);
+			}
+			if (!realtimeBgm) {
+				status = RETRO_BGM_NOT_M4A;
+			}
+		} else if (status == RETRO_BGM_OK) {
 			struct RealtimeBgmEngine engine;
 			if (RealtimeBgmM4aEngine(core, gba->memory.rom, gba->memory.romSize, &m4a, &engine)) {
 				realtimeBgm = RealtimeBgmCreate(core, gba->memory.rom, gba->memory.romSize, &engine, targetSampleRate);

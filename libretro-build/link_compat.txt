@@ -93,3 +93,6 @@ ce1797464c7c9e6a 3b52706bfa2141f6
 # Reset copies the ROM only with a GPIO base: link cores always have one (a
 # multicart clears it but is never pristine), so 2P frames are untouched.
 1416f5616eceff1d 3b52706bfa2141f6
+# A self-describing streamed player (realtime-bgm-stream.c) for realtime BGM: shadow-only, a
+# fallback after the m4a locate; 2P frames are untouched.
+b7d31f9c3865c880 3b52706bfa2141f6

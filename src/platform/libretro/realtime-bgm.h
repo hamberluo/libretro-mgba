@@ -35,6 +35,19 @@ struct RealtimeBgmEngine;
 bool RealtimeBgmM4aEngine(struct mCore* main, const void* rom, size_t romSize, const struct RealtimeBgmM4a* m4a,
                           struct RealtimeBgmEngine* out);
 
+// A game's own streamed player that describes itself (tag "RTBGMS01", realtime-bgm-stream.c): Thumb entries and
+// its command log; music and effects on separate Direct Sound lanes.
+struct RealtimeBgmStream {
+	uint32_t log;
+	uint32_t apply;
+	uint32_t frame;
+	uint16_t musicLane;
+	uint16_t sfxLane;
+};
+
+bool RealtimeBgmStreamLocate(const uint8_t* rom, size_t romSize, struct RealtimeBgmStream* out);
+bool RealtimeBgmStreamEngine(struct mCore* main, const struct RealtimeBgmStream* d, struct RealtimeBgmEngine* out);
+
 // Two parked shadow cores cloned from main: music at 1x wall time, effects in
 // lockstep with main. Emulation thread only.
 struct RealtimeBgm;

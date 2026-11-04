@@ -212,6 +212,9 @@ static int exactOrSplit(bool split, int warm, int frames) {
 		double c = bestCorr(&mainPcm, &music, 4096, n - 8192, 2048);
 		printf("exact corr=%.3f rms main=%.0f music=%.0f status %d\n", c, rms(mainPcm.s, n * 2), rms(music.s, n * 2),
 		       RealtimeBgmStatus(bgm));
+		if (getenv("SHOT_MAIN")) {
+			writeWav(getenv("SHOT_MAIN"), &mainPcm);
+		}
 		if (getenv("SHOT")) {
 			writeWav(getenv("SHOT"), &music);
 		}
@@ -347,16 +350,27 @@ int main(int argc, char** argv) {
 	vf->close(vf);
 
 	struct RealtimeBgmM4a m4a;
+	struct RealtimeBgmStream stream;
 	enum retro_bgm_status status = RealtimeBgmLocate(rom, romSize, &m4a);
-	printf("status %d SoundMain=%08X VSync=%08X MPlayStart=%08X MPlayStop=%08X\n", status, m4a.soundMain, m4a.soundVSync,
-	       m4a.mplayStart, m4a.mplayStop);
+	bool streamed = status != RETRO_BGM_OK && RealtimeBgmStreamLocate(rom, romSize, &stream);
+	if (streamed) {
+		status = RETRO_BGM_OK;
+		printf("status %d stream log=%08X apply=%08X frame=%08X\n", status, stream.log, stream.apply, stream.frame);
+	} else {
+		printf("status %d SoundMain=%08X VSync=%08X MPlayStart=%08X MPlayStop=%08X\n", status, m4a.soundMain, m4a.soundVSync,
+		       m4a.mplayStart, m4a.mplayStop);
+	}
 	if (!strcmp(argv[2], "find") || status != RETRO_BGM_OK) {
 		free(rom);
 		return status == RETRO_BGM_OK ? 0 : 1;
 	}
 	makeMain();
 	struct RealtimeBgmEngine engine;
-	RealtimeBgmM4aEngine(mainCore, rom, romSize, &m4a, &engine);
+	if (streamed) {
+		RealtimeBgmStreamEngine(mainCore, &stream, &engine);
+	} else {
+		RealtimeBgmM4aEngine(mainCore, rom, romSize, &m4a, &engine);
+	}
 	bgm = RealtimeBgmCreate(mainCore, rom, romSize, &engine, RATE);
 	int warm = argc > 3 ? atoi(argv[3]) : 600;
 	int frames = argc > 4 ? atoi(argv[4]) : 600;
