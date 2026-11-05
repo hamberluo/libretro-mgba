@@ -29,6 +29,7 @@ struct RealtimeBgmGb {
 };
 
 #define REALTIME_BGM_GB1_AUDIO_BANK 0xC0EFu // gen1 wAudioROMBank
+#define REALTIME_BGM_GB1_LOADED_BANK 0xFFB8u // gen1 hLoadedROMBank
 #define REALTIME_BGM_GB2_GLOBALS 0x40       // gen2 engine state after wChannel8, copied with the channels
 #define REALTIME_BGM_GB1_DRUM_MAX 0x13      // gen1 channel 8 ids 01-13: the music's drums
 

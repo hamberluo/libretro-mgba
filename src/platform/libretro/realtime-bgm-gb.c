@@ -162,7 +162,12 @@ static bool callEngine(const struct Gb* e, const struct RealtimeBgmShadow* s) {
 	}
 	// The shadow's own song: its copy of the bank came with the last sync.
 	uint8_t bank = rd(gbOf(s), REALTIME_BGM_GB1_AUDIO_BANK);
-	return !e->gb.updateMusic[bank] || call(e, s, bank, e->gb.updateMusic[bank]);
+	if (!e->gb.updateMusic[bank]) {
+		return true;
+	}
+	// Home helpers bank back to this record (Yellow): a stale one returns into another bank.
+	wr(gbOf(s), REALTIME_BGM_GB1_LOADED_BANK, bank);
+	return call(e, s, bank, e->gb.updateMusic[bank]);
 }
 
 // The boot ROM covers bank 0 until the game writes FF50. Calls push below the

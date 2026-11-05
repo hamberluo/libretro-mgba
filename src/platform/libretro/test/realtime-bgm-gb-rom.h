@@ -19,6 +19,8 @@
 #define GB_STUB_ENGINE 0x4000 // bank 1: ld hl,$D000; inc [hl]; ret
 #define GB_STUB_SPIN 0x4010   // bank 1: jr -2
 #define GB_STUB_SLOW 0x4020   // bank 1: GB_STUB_ENGINE, then ~4k cycles on odd calls
+#define GB_STUB_HOME_CALL 0x4030 // bank 1: call GB_STUB_HOME, then GB_STUB_ENGINE
+#define GB_STUB_HOME 0x0070      // ldh a,[hLoadedROMBank]; ld [$2000],a; ret
 #define GB_STUB_CALLS 0xD000
 
 // Audible: before spinning, the cartridge starts a square wave on channel 2.
@@ -47,6 +49,10 @@ static inline void gbBuildRom(uint8_t* rom, bool audible) {
 	// ld hl,$D000; inc [hl]; bit 0,[hl]; ret z; ld b,0; dec b; jr nz,-3; ret
 	static const uint8_t slow[] = { 0x21, 0x00, 0xD0, 0x34, 0xCB, 0x46, 0xC8, 0x06, 0x00, 0x05, 0x20, 0xFD, 0xC9 };
 	memcpy(&rom[GB_STUB_SLOW], slow, sizeof(slow));
+	static const uint8_t homeCall[] = { 0xCD, GB_STUB_HOME & 0xFF, GB_STUB_HOME >> 8, 0x21, 0x00, 0xD0, 0x34, 0xC9 };
+	memcpy(&rom[GB_STUB_HOME_CALL], homeCall, sizeof(homeCall));
+	static const uint8_t home[] = { 0xF0, 0xB8, 0xEA, 0x00, 0x20, 0xC9 };
+	memcpy(&rom[GB_STUB_HOME], home, sizeof(home));
 }
 
 #endif

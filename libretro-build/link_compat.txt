@@ -96,3 +96,6 @@ ce1797464c7c9e6a 3b52706bfa2141f6
 # A self-describing streamed player (realtime-bgm-stream.c) for realtime BGM: shadow-only, a
 # fallback after the m4a locate; 2P frames are untouched.
 b7d31f9c3865c880 3b52706bfa2141f6
+# gen1 shadows record the bank they call into in hLoadedROMBank (realtime-bgm-gb.c): shadow-only,
+# 2P frames are untouched.
+b0c3db59179f7525 3b52706bfa2141f6

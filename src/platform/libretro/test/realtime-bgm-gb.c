@@ -181,6 +181,20 @@ static void gen1_unknown_bank_skips(void) {
 	done(bgm, core);
 }
 
+static void gen1_home_banks_back_to_engine(void) {
+	struct mCore* core = mainCore();
+	struct RealtimeBgmGb gb = gen1();
+	gb.updateMusic[1] = GB_STUB_HOME_CALL;
+	struct RealtimeBgm* bgm = create(core, gb);
+	core->busWrite8(core, REALTIME_BGM_GB1_AUDIO_BANK, 1);
+	core->busWrite8(core, IDS + 0, 0x01);
+	RealtimeBgmSetSpeed(bgm, 4, true);
+	RealtimeBgmRun(bgm, 2);
+	CHECK(RealtimeBgmStatus(bgm) == RETRO_BGM_OK);
+	CHECK(shadow(bgm, false)->busRead8(shadow(bgm, false), GB_STUB_CALLS) == 2);
+	done(bgm, core);
+}
+
 static void budget_falls_back(void) {
 	struct mCore* core = mainCore();
 	struct RealtimeBgmGb gb = gen2();
@@ -313,6 +327,7 @@ int main(void) {
 	effects_shadow_dacs_off_after_clone();
 	gen1_drum_is_music();
 	gen1_unknown_bank_skips();
+	gen1_home_banks_back_to_engine();
 	budget_falls_back();
 	music_lane_steady_when_engine_cost_varies();
 	boot_rom_not_ready();
