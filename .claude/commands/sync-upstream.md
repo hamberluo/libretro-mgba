@@ -47,6 +47,8 @@ For every commit, decide one of: **already here**, **merge**, **skip (does not a
 
 - libretro/mgba `517e518c4` (linear resampler), `d030c2aa0` (RetroArch VFS), and CMake / file-rename / CI reshuffles: not merged.
 - PNG fixes: skipped while `USE_PNG` is off.
+- Cosine interpolator fixes (`2d3758f92`, `c8ed0ba58`): skipped; libretro only uses SINC, and upstream's weights are still reversed (weight 0 returns `right`).
+- Bundled zlib updates: skipped; zlib is only an include path under `STATIC_LINKING`.
 - Leftover rewind declarations (`include/mgba/core/rewind.h`, `config.h` `rewind*`) stay. Rewind in libretro is the frontend's job, done through `retro_serialize`.
 
 ## 4. Report

@@ -99,3 +99,6 @@ b7d31f9c3865c880 3b52706bfa2141f6
 # gen1 shadows record the bank they call into in hLoadedROMBank (realtime-bgm-gb.c): shadow-only,
 # 2P frames are untouched.
 b0c3db59179f7525 3b52706bfa2141f6
+# Upstream sync to mgba 662dada8b: HLE SWI 0xD4 (was a stub) and a saturating sinc
+# output (audio only); 2P frames are untouched.
+d93a5637280431e7 3b52706bfa2141f6

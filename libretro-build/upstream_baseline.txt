@@ -3,5 +3,5 @@
 #
 #   <name>  <upstream commit>  <date reviewed>
 
-mgba      c3c8e5e81  2026-09-29
-libretro  7a12d6d4b  2026-09-29
+mgba      662dada8b  2026-11-09
+libretro  7a12d6d4b  2026-11-09
