@@ -83,7 +83,14 @@ int16_t mInterpolatorSincInterpolate(const struct mInterpolator* interpolator, c
 		kernelSum += kernel;
 		sum += data->at(index + i, data->context) * kernel;
 	}
-	return sum / kernelSum;
+	sum /= kernelSum;
+	if (sum > INT16_MAX) {
+		return INT16_MAX;
+	}
+	if (sum < INT16_MIN) {
+		return INT16_MIN;
+	}
+	return sum;
 }
 
 void mInterpolatorCosineInit(struct mInterpolatorCosine* interp, unsigned resolution) {
