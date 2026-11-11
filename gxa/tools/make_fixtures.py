@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 """Writes the core tests' GXA fixtures (src/gba/test/gxa): run once, commit the output."""
+import hashlib
 import io
 import json
 import pathlib
@@ -44,6 +45,15 @@ def main():
     pack(OUT / 'fixture.gxa', manifest, files)
     pack(OUT / 'bad-deflate.gxa', manifest, files, deflate={'t1.ogg'})
     pack(OUT / 'bad-spec.gxa', dict(manifest, spec=2), files)
+    pack(OUT / 'sha1.gxa', dict(manifest, match=[{'sha1': hashlib.sha1(test_rom()).hexdigest()}]), files)
+
+
+def test_rom(code=b'GXAT'):
+    """The tests' 192-byte ROM image: zeros, title at 0xA0, game code at 0xAC (src/gba/test/gxa-pack.c)"""
+    rom = bytearray(192)
+    rom[0xA0:0xA8] = b'GXA TEST'
+    rom[0xAC:0xB0] = code
+    return bytes(rom)
 
 
 if __name__ == '__main__':
