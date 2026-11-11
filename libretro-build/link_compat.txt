@@ -102,3 +102,6 @@ b0c3db59179f7525 3b52706bfa2141f6
 # Upstream sync to mgba 662dada8b: HLE SWI 0xD4 (was a stub) and a saturating sinc
 # output (audio only); 2P frames are untouched.
 d93a5637280431e7 3b52706bfa2141f6
+# GXA external audio (registers at 0x04FFFA00, mixing, extra state): link cores
+# never attach GXA and link_begin detaches it; link-compat passes, 2P frames untouched.
+8633fedf7a4042c6 3b52706bfa2141f6
