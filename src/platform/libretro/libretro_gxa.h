@@ -6,7 +6,7 @@
 #ifndef LIBRETRO_GXA_H
 #define LIBRETRO_GXA_H
 
-// GXA external audio (gxa/SPEC.md): a GBA ROM plays tracks from a .gxa pack.
+// GXA external audio (the gba-gxa repository's SPEC.md): a GBA ROM plays tracks from a .gxa pack.
 // Frontends resolve these with dlsym; other cores lack them. Without a call to
 // retro_gxa_load, retro_load_game loads <rom path without extension>.gxa when
 // it exists.

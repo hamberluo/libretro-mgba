@@ -10,7 +10,7 @@
 
 CXX_GUARD_START
 
-// GXA: external audio for GBA ROMs (gxa/SPEC.md). A ROM writes registers at
+// GXA: external audio for GBA ROMs (the gba-gxa repository's SPEC.md). A ROM writes registers at
 // 0x04FFFA00; the emulator plays tracks from a .gxa pack (a store-only zip).
 
 #define GXA_BASE 0xFFFA00

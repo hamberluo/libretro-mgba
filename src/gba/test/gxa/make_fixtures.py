@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Writes the core tests' GXA fixtures (src/gba/test/gxa): run once, commit the output."""
+"""Writes the core tests' GXA fixtures (src/gba/test/gxa): run once, commit the output.
+The conformance ROM and its pack here are copies of gba-gxa's test-rom (built there)."""
 import hashlib
 import io
 import json

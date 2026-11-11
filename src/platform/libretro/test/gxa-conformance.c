@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// The conformance ROM (gxa/test-rom) passes every case on this core, with its
+// The conformance ROM (gba-gxa's test-rom, built copies in src/gba/test/gxa) passes every case on this core, with its
 // pack picked up beside it as a RetroArch user would place it.
 
 #include "../libretro_gxa.h"
@@ -60,7 +60,7 @@ static int16_t inputState(unsigned port, unsigned device, unsigned index, unsign
 int main(void) {
 	char path[1024];
 	const char* slash = strrchr(__FILE__, '/');
-	snprintf(path, sizeof(path), "%.*s/../../../../gxa/test-rom/gxa-conformance.gba", (int) (slash - __FILE__), __FILE__);
+	snprintf(path, sizeof(path), "%.*s/../../../gba/test/gxa/conformance.gba", (int) (slash - __FILE__), __FILE__);
 	retro_set_environment(env);
 	retro_set_video_refresh(video);
 	retro_set_audio_sample_batch(audio);

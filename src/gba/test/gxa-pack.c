@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// GXA packs: store-only zips with manifest.json (gxa/tools/make_fixtures.py
+// GXA packs: store-only zips with manifest.json (src/gba/test/gxa/make_fixtures.py
 // writes the fixtures). Track lookup, rejected packs, and ROM matching.
 
 #include <mgba/internal/gba/gxa.h>
