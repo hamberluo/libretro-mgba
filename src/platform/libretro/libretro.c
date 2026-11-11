@@ -3312,7 +3312,7 @@ RETRO_API int retro_gxa_load(const char* path) {
 		return gxaStatus;
 	}
 	struct GBA* gba = core->board;
-	enum GXAMatch match = GXAPackMatch(pack, gba->memory.rom, gba->memory.romSize);
+	enum GXAMatch match = GXAPackMatch(pack, gba->memory.rom, gba->pristineRomSize);   // romSize counts the padding
 	if (match == GXA_MATCH_NONE) {
 		GXAPackClose(pack);
 		gxaStatus = RETRO_GXA_NO_MATCH;

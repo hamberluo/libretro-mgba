@@ -261,12 +261,16 @@ void GXAPackClose(struct GXAPack* pack) {
 
 enum GXAMatch GXAPackMatch(const struct GXAPack* pack, const void* rom, size_t size) {
 	uint8_t digest[20];
-	sha1Buffer(rom, size, digest);
+	bool hashed = false;   // up to 64 MB: only for a pack with SHA-1 rules
 	enum GXAMatch best = GXA_MATCH_NONE;
 	size_t i;
 	for (i = 0; i < pack->nMatch; ++i) {
 		const struct GXAMatchRule* r = &pack->match[i];
 		if (r->sha1) {
+			if (!hashed) {
+				sha1Buffer(rom, size, digest);
+				hashed = true;
+			}
 			if (!memcmp(r->digest, digest, 20)) {
 				return GXA_MATCH_SHA1;
 			}

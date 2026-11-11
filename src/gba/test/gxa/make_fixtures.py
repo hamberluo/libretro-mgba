@@ -47,6 +47,7 @@ def main():
     pack(OUT / 'bad-deflate.gxa', manifest, files, deflate={'t1.ogg'})
     pack(OUT / 'bad-spec.gxa', dict(manifest, spec=2), files)
     pack(OUT / 'sha1.gxa', dict(manifest, match=[{'sha1': hashlib.sha1(test_rom()).hexdigest()}]), files)
+    pack(OUT / 'sha1-odd.gxa', dict(manifest, match=[{'sha1': hashlib.sha1(odd_rom()).hexdigest()}]), files)
     pack(OUT / 'version.gxa', dict(manifest, match=[{'code': 'GXAT', 'title': 'GXA TEST', 'version': [2, 5]},
                                                    {'code': 'GXAV', 'title': 'GXA TEST', 'version': 3}]), files)
 
@@ -58,6 +59,16 @@ def test_rom(code=b'GXAT'):
     rom[0xAC:0xB0] = code
     return bytes(rom)
 
+
+
+def odd_rom():
+    """gxa-libretro's loadable ROM at a size that is not a power of two: the core pads it in memory"""
+    rom = bytearray(0x80100)
+    rom[0:4] = b'\xFE\xFF\xFF\xEA'
+    rom[0xA0:0xA8] = b'GXA TEST'
+    rom[0xAC:0xB0] = b'GXAT'
+    rom[0xB2] = 0x96
+    return bytes(rom)
 
 if __name__ == '__main__':
     main()

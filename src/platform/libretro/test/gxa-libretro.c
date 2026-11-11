@@ -231,6 +231,20 @@ static void gxa_libretro_autoload(void) {
 	rmdir(dir);
 }
 
+// The SHA-1 is the file's: a ROM whose size is not a power of two is padded
+// in memory, and the padding must not change the hash (sha1-odd.gxa).
+static void gxa_libretro_sha1_unpadded(void) {
+	static uint8_t odd[0x80100];
+	makeRom("GXAT");
+	memcpy(odd, rom, sizeof(rom));
+	struct retro_game_info info = { .path = NULL, .data = odd, .size = sizeof(odd) };
+	CHECK(retro_load_game(&info));
+	char pack[1024];
+	snprintf(pack, sizeof(pack), "%.*s/sha1-odd.gxa", (int) (strrchr(fixture, '/') - fixture), fixture);
+	CHECK(retro_gxa_load(pack) == RETRO_GXA_OK);
+	retro_unload_game();
+}
+
 // The linked machine has no GXA: a pack mid-track must not keep ducking it.
 static void gxa_libretro_link(void) {
 	load("GXAT");
@@ -260,6 +274,7 @@ int main(void) {
 	gxa_libretro_reset();
 	gxa_libretro_autoload();
 	gxa_libretro_link();
+	gxa_libretro_sha1_unpadded();
 	retro_deinit();
 	printf("gxa-libretro: %s\n", failures ? "FAILED" : "ok");
 	return failures ? 1 : 0;
