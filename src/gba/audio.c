@@ -9,6 +9,7 @@
 #include <mgba/core/sync.h>
 #include <mgba/internal/gba/dma.h>
 #include <mgba/internal/gba/gba.h>
+#include <mgba/internal/gba/gxa.h>
 #include <mgba/internal/gba/io.h>
 #include <mgba/internal/gba/serialize.h>
 #include <mgba/internal/gba/video.h>
@@ -416,6 +417,10 @@ static void _sample(struct mTiming* timing, void* user, uint32_t cyclesLate) {
 
 	mCoreSyncLockAudio(audio->p->sync);
 	mAudioBufferWrite(&audio->psg.buffer, (int16_t*) audio->currentSamples, samples);
+	if (audio->p->gxa) {
+		// external audio runs on the same clock as the game's own samples
+		GXAProduce(audio->p->gxa, samples, GBA_ARM7TDMI_FREQUENCY / audio->sampleInterval);
+	}
 	if (audio->p->stream) {
 		if (audio->p->stream->postAudioFrame) {
 			int i;

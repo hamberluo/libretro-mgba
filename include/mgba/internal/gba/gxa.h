@@ -47,6 +47,12 @@ uint16_t GXARead16(struct GXA*, uint32_t offset);
 void GXAWrite16(struct GXA*, uint32_t offset, uint16_t value);
 // Q8 (256 = unity): GAMEVOL, times DUCK while any channel plays.
 int32_t GXAGameGain(const struct GXA*);
+// Advances every channel by frames output frames at rate (emulated time) and renders them into a stereo ring.
+void GXAProduce(struct GXA*, unsigned frames, unsigned rate);
+size_t GXARead(struct GXA*, int16_t* stereo, size_t maxFrames);
+size_t GXAAvailable(const struct GXA*);
+// Inaudible: channels still advance and end, nothing is decoded, the ring gets silence.
+void GXASetAudible(struct GXA*, bool audible);
 
 CXX_GUARD_END
 
