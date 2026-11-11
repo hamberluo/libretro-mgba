@@ -9,6 +9,7 @@
 // sound, and the frontend's volume.
 
 #include "../libretro_gxa.h"
+#include "../libretro_link.h"
 
 #include <mgba/core/core.h>
 #include <mgba-util/common.h>
@@ -230,6 +231,19 @@ static void gxa_libretro_autoload(void) {
 	rmdir(dir);
 }
 
+// The linked machine has no GXA: a pack mid-track must not keep ducking it.
+static void gxa_libretro_link(void) {
+	load("GXAT");
+	retro_gxa_load(fixture);
+	play(1, 100);
+	retro_run();
+	struct retro_link_player saves[2] = { { NULL, 0 }, { NULL, 0 } };
+	CHECK(retro_link_begin(2, 0, saves, 0));
+	CHECK(retro_gxa_status() == RETRO_GXA_NONE);
+	retro_link_end();
+	retro_unload_game();
+}
+
 int main(void) {
 	const char* slash = strrchr(__FILE__, '/');
 	snprintf(fixture, sizeof(fixture), "%.*s/../../../gba/test/gxa/fixture.gxa", (int) (slash - __FILE__), __FILE__);
@@ -245,6 +259,7 @@ int main(void) {
 	gxa_libretro_duck();
 	gxa_libretro_reset();
 	gxa_libretro_autoload();
+	gxa_libretro_link();
 	retro_deinit();
 	printf("gxa-libretro: %s\n", failures ? "FAILED" : "ok");
 	return failures ? 1 : 0;

@@ -3173,6 +3173,7 @@ RETRO_API bool retro_link_begin(unsigned players, unsigned localPlayer,
 	// The single-player machine is replaced by the local player's linked one;
 	// `savedata` stays the SAVE_RAM buffer the frontend holds.
 	_realtimeBgmUnload();
+	_gxaDetach();
 	mCoreConfigDeinit(&core->config);
 	core->deinit(core);
 	activeLink = created;
