@@ -50,6 +50,9 @@ static const struct GBACartridgeOverride _overrides[] = {
 	{ "BDBE", GBA_SAVEDATA_EEPROM, HW_NONE, GBA_IDLE_LOOP_NONE },
 	{ "BDBP", GBA_SAVEDATA_EEPROM, HW_NONE, GBA_IDLE_LOOP_NONE },
 
+	// Langrisser II (GBA remaster, a fan port: its own code)
+	{ "ZL2J", GBA_SAVEDATA_SRAM, HW_RUMBLE, GBA_IDLE_LOOP_NONE },
+
 	// Drill Dozer
 	{ "V49J", GBA_SAVEDATA_SRAM, HW_RUMBLE, GBA_IDLE_LOOP_NONE },
 	{ "V49E", GBA_SAVEDATA_SRAM, HW_RUMBLE, GBA_IDLE_LOOP_NONE },
