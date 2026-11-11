@@ -5,6 +5,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include <mgba/internal/gba/gxa.h>
 
+#include <mgba/core/serialize.h>
+
 #define STB_VORBIS_NO_STDIO
 #define STB_VORBIS_NO_PUSHDATA_API
 #include "third-party/stb/stb_vorbis.c"
@@ -99,25 +101,21 @@ static void _stop(struct GXAChannel* c, uint16_t state) {
 	c->state = state;
 }
 
-static void _play(struct GXA* gxa, struct GXAChannel* c, bool loop) {
-	_close(c);
-	c->elapsedMs = 0;
-	c->pos = 0;
-	c->cacheLen = 0;
-	c->loop = loop;
+// Opens c->track's decoder; on failure sets the channel's state and returns false.
+static bool _open(struct GXA* gxa, struct GXAChannel* c) {
 	const void* data;
 	size_t size;
 	int32_t loopFrame;
 	float gainDb;
 	if (!gxa->pack || !GXAPackTrack(gxa->pack, c->track, &data, &size, &loopFrame, &gainDb)) {
 		c->state = STATE_MISSING | STATE_ENDED;
-		return;
+		return false;
 	}
 	int err = 0;
 	c->dec = stb_vorbis_open_memory(data, (int) size, &err, NULL);
 	if (!c->dec) {
 		c->state = STATE_ERROR | STATE_ENDED;
-		return;
+		return false;
 	}
 	stb_vorbis_info info = stb_vorbis_get_info(c->dec);
 	c->srcRate = info.sample_rate;
@@ -125,12 +123,24 @@ static void _play(struct GXA* gxa, struct GXAChannel* c, bool loop) {
 	c->total = stb_vorbis_stream_length_in_samples(c->dec);
 	c->loopFrame = loopFrame > 0 && loopFrame < c->total ? loopFrame : 0;
 	c->gain = powf(10.f, gainDb / 20.f);
-	c->cur = c->target = c->vol / (float) GXA_UNITY;
-	c->fadeLeftMs = 0;
+	c->cacheLen = 0;
 	if (!c->total || !c->srcRate) {
 		_stop(c, STATE_ERROR | STATE_ENDED);
+		return false;
+	}
+	return true;
+}
+
+static void _play(struct GXA* gxa, struct GXAChannel* c, bool loop) {
+	_close(c);
+	c->elapsedMs = 0;
+	c->pos = 0;
+	c->loop = loop;
+	if (!_open(gxa, c)) {
 		return;
 	}
+	c->cur = c->target = c->vol / (float) GXA_UNITY;
+	c->fadeLeftMs = 0;
 	c->state = STATE_PLAYING;
 }
 
@@ -391,4 +401,92 @@ size_t GXAAvailable(const struct GXA* gxa) {
 
 void GXASetAudible(struct GXA* gxa, bool audible) {
 	gxa->audible = audible;
+}
+
+// Savestate item: version 1, the pack's id, the global registers, then per channel its
+// registers and play position. Little-endian, as mGBA's states.
+#define GXA_STATE_VERSION 1
+#define GXA_STATE_CHANNEL (8 + 1 + 8 * 3 + 4 * 2)
+#define GXA_STATE_SIZE (1 + 20 + 6 + GXA_STATE_CHANNEL * GXA_CHANNELS)
+
+static uint8_t* _put(uint8_t* p, const void* v, size_t n) {
+	memcpy(p, v, n);
+	return p + n;
+}
+
+static const uint8_t* _get(const uint8_t* p, void* v, size_t n) {
+	memcpy(v, p, n);
+	return p + n;
+}
+
+void GXASerialize(struct GXA* gxa, struct mStateExtdataItem* item) {
+	uint8_t* buf = calloc(1, GXA_STATE_SIZE);
+	uint8_t* p = buf;
+	*p++ = GXA_STATE_VERSION;
+	uint8_t id[20] = { 0 };
+	if (gxa->pack) {
+		GXAPackId(gxa->pack, id);
+	}
+	p = _put(p, id, 20);
+	p = _put(p, &gxa->handshake, 2);
+	p = _put(p, &gxa->gamevol, 2);
+	p = _put(p, &gxa->duck, 2);
+	size_t i;
+	for (i = 0; i < GXA_CHANNELS; ++i) {
+		const struct GXAChannel* c = &gxa->ch[i];
+		p = _put(p, &c->track, 2);
+		p = _put(p, &c->vol, 2);
+		p = _put(p, &c->fade, 2);
+		p = _put(p, &c->state, 2);
+		*p++ = c->loop;
+		p = _put(p, &c->pos, 8);
+		p = _put(p, &c->elapsedMs, 8);
+		p = _put(p, &c->fadeLeftMs, 8);
+		p = _put(p, &c->cur, 4);
+		p = _put(p, &c->target, 4);
+	}
+	item->size = GXA_STATE_SIZE;
+	item->data = buf;
+	item->clean = free;
+}
+
+void GXADeserialize(struct GXA* gxa, const struct mStateExtdataItem* item) {
+	_reset(gxa);
+	if (!item || item->size != GXA_STATE_SIZE || ((const uint8_t*) item->data)[0] != GXA_STATE_VERSION) {
+		return;
+	}
+	const uint8_t* p = (const uint8_t*) item->data + 1;
+	uint8_t id[20], ours[20] = { 0 };
+	p = _get(p, id, 20);
+	if (gxa->pack) {
+		GXAPackId(gxa->pack, ours);
+	}
+	bool samePack = gxa->pack && !memcmp(id, ours, 20);
+	p = _get(p, &gxa->handshake, 2);
+	p = _get(p, &gxa->gamevol, 2);
+	p = _get(p, &gxa->duck, 2);
+	size_t i;
+	for (i = 0; i < GXA_CHANNELS; ++i) {
+		struct GXAChannel* c = &gxa->ch[i];
+		p = _get(p, &c->track, 2);
+		p = _get(p, &c->vol, 2);
+		p = _get(p, &c->fade, 2);
+		p = _get(p, &c->state, 2);
+		c->loop = *p++;
+		p = _get(p, &c->pos, 8);
+		p = _get(p, &c->elapsedMs, 8);
+		p = _get(p, &c->fadeLeftMs, 8);
+		p = _get(p, &c->cur, 4);
+		p = _get(p, &c->target, 4);
+		if (c->state & (STATE_PLAYING | STATE_PAUSED)) {
+			if (!samePack) {
+				c->state = STATE_ENDED;
+			} else {
+				uint16_t state = c->state;
+				if (_open(gxa, c)) {
+					c->state = state;
+				}
+			}
+		}
+	}
 }

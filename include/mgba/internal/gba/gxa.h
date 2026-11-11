@@ -51,6 +51,11 @@ int32_t GXAGameGain(const struct GXA*);
 void GXAProduce(struct GXA*, unsigned frames, unsigned rate);
 size_t GXARead(struct GXA*, int16_t* stereo, size_t maxFrames);
 size_t GXAAvailable(const struct GXA*);
+struct mStateExtdataItem;
+// The state as an extdata item (EXTDATA_GXA); NULL to deserialize resets GXA to idle. Channels
+// of another pack (or none) read ended.
+void GXASerialize(struct GXA*, struct mStateExtdataItem*);
+void GXADeserialize(struct GXA*, const struct mStateExtdataItem*);
 // Inaudible: channels still advance and end, nothing is decoded, the ring gets silence.
 void GXASetAudible(struct GXA*, bool audible);
 

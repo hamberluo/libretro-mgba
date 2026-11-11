@@ -54,7 +54,7 @@ void RetroRewindFrame(struct RetroRewind* rewind, struct mCore* core) {
 	slot->seek(slot, 0, SEEK_SET);
 	// No SAVESTATE_SAVEDATA: retro_unserialize never restores the battery save
 	// either, so a rewind must not roll it back.
-	if (!mCoreSaveStateNamed(core, slot, SAVESTATE_RTC)) {
+	if (!mCoreSaveStateNamed(core, slot, SAVESTATE_RTC | SAVESTATE_GXA)) {
 		// When the ring is full this slot held the oldest snapshot.
 		if (rewind->count == rewind->capacity) {
 			--rewind->count;
@@ -85,7 +85,7 @@ unsigned RetroRewindStep(struct RetroRewind* rewind, struct mCore* core, unsigne
 	unsigned target = (rewind->head + rewind->capacity - back) % rewind->capacity;
 	struct VFile* slot = rewind->slots[target];
 	slot->seek(slot, 0, SEEK_SET);
-	if (!mCoreLoadStateNamed(core, slot, SAVESTATE_RTC)) {
+	if (!mCoreLoadStateNamed(core, slot, SAVESTATE_RTC | SAVESTATE_GXA)) {
 		return 0;
 	}
 	// The loaded snapshot stays as the newest: it is exactly now.

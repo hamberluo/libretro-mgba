@@ -11,6 +11,10 @@
 #include <mgba/core/version.h>
 #include <mgba-util/memory.h>
 #include <mgba-util/vfs.h>
+#ifdef M_CORE_GBA
+#include <mgba/internal/gba/gba.h>
+#include <mgba/internal/gba/gxa.h>
+#endif
 
 #ifdef USE_PNG
 #include <mgba-util/image/png-io.h>
@@ -450,6 +454,14 @@ bool mCoreSaveStateNamed(struct mCore* core, struct VFile* vf, int flags) {
 			mStateExtdataPut(&extdata, EXTDATA_RTC, &item);
 		}
 	}
+#ifdef M_CORE_GBA
+	struct GXA* gxa = core->platform(core) == mPLATFORM_GBA ? ((struct GBA*) core->board)->gxa : NULL;
+	if (flags & SAVESTATE_GXA && gxa) {
+		struct mStateExtdataItem item;
+		GXASerialize(gxa, &item);
+		mStateExtdataPut(&extdata, EXTDATA_GXA, &item);
+	}
+#endif
 #ifdef USE_PNG
 	size_t stride;
 	const void* pixels = NULL;
@@ -574,6 +586,13 @@ bool mCoreLoadStateNamed(struct mCore* core, struct VFile* vf, int flags) {
 			core->rtc.d.deserialize(&core->rtc.d, &item);
 		}
 	}
+#ifdef M_CORE_GBA
+	struct GXA* gxa = core->platform(core) == mPLATFORM_GBA ? ((struct GBA*) core->board)->gxa : NULL;
+	if (flags & SAVESTATE_GXA && gxa) {
+		// a state without GXA's item (older, or saved without it) resets GXA to idle
+		GXADeserialize(gxa, mStateExtdataGet(&extdata, EXTDATA_GXA, &item) ? &item : NULL);
+	}
+#endif
 	mStateExtdataDeinit(&extdata);
 	return success;
 }
