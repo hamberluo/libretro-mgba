@@ -105,3 +105,4 @@ d93a5637280431e7 3b52706bfa2141f6
 # GXA external audio (registers at 0x04FFFA00, mixing, extra state): link cores
 # never attach GXA and link_begin detaches it; link-compat passes, 2P frames untouched.
 8633fedf7a4042c6 3b52706bfa2141f6
+b0d2f675f2fce45a 3b52706bfa2141f6
