@@ -2486,7 +2486,7 @@ size_t retro_serialize_size(void) {
 		_doDeferredSetup();
 	}
 	struct VFile* vfm = VFileMemChunk(NULL, 0);
-	mCoreSaveStateNamed(core, vfm, SAVESTATE_SAVEDATA | SAVESTATE_RTC | SAVESTATE_GXA);
+	mCoreSaveStateNamed(core, vfm, SAVESTATE_SAVEDATA | SAVESTATE_RTC);
 	size_t size = vfm->size(vfm);
 	vfm->close(vfm);
 	return size;
@@ -2500,7 +2500,7 @@ bool retro_serialize(void* data, size_t size) {
 		_doDeferredSetup();
 	}
 	struct VFile* vfm = VFileMemChunk(NULL, 0);
-	mCoreSaveStateNamed(core, vfm, SAVESTATE_SAVEDATA | SAVESTATE_RTC | SAVESTATE_GXA);
+	mCoreSaveStateNamed(core, vfm, SAVESTATE_SAVEDATA | SAVESTATE_RTC);
 	if ((ssize_t) size > vfm->size(vfm)) {
 		size = vfm->size(vfm);
 	} else if ((ssize_t) size < vfm->size(vfm)) {
@@ -2521,7 +2521,7 @@ bool retro_unserialize(const void* data, size_t size) {
 		_doDeferredSetup();
 	}
 	struct VFile* vfm = VFileFromConstMemory(data, size);
-	bool success = mCoreLoadStateNamed(core, vfm, SAVESTATE_RTC | SAVESTATE_GXA);
+	bool success = mCoreLoadStateNamed(core, vfm, SAVESTATE_RTC);
 	vfm->close(vfm);
 	if (success) {
 		RetroRewindClear(&rewindRing);

@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// GXA's state rides in the savestate's extdata: a load resumes the same
+// GXA's state rides in the GBA core's extra state (extdata): a load resumes the same
 // samples, a changed pack ends what played, a state without GXA resets it,
 // and the libretro rewind ring carries it.
 
@@ -97,11 +97,11 @@ static void gxa_state_roundtrip(void) {
 	run(core, 18, NULL);   // ~0.3 s
 	uint32_t saved = pos(core);
 	struct VFile* vf = VFileMemChunk(NULL, 0);
-	CHECK(mCoreSaveStateNamed(core, vf, SAVESTATE_GXA));
+	CHECK(mCoreSaveStateNamed(core, vf, 0));
 	static int16_t a[0x10000], b[0x10000];
 	size_t na = run(core, 12, a);
 	vf->seek(vf, 0, SEEK_SET);
-	CHECK(mCoreLoadStateNamed(core, vf, SAVESTATE_GXA));
+	CHECK(mCoreLoadStateNamed(core, vf, 0));
 	CHECK(pos(core) == saved);
 	CHECK(core->busRead16(core, CH0(STATE)) == S_PLAYING);
 	size_t nb = run(core, 12, b);
@@ -122,10 +122,10 @@ static void gxa_state_pack_changed(void) {
 	play(core, 1);
 	run(core, 6, NULL);
 	struct VFile* vf = VFileMemChunk(NULL, 0);
-	CHECK(mCoreSaveStateNamed(core, vf, SAVESTATE_GXA));
+	CHECK(mCoreSaveStateNamed(core, vf, 0));
 	GXASetPack(gxaOf(core), NULL);
 	vf->seek(vf, 0, SEEK_SET);
-	CHECK(mCoreLoadStateNamed(core, vf, SAVESTATE_GXA));
+	CHECK(mCoreLoadStateNamed(core, vf, 0));
 	CHECK(core->busRead16(core, CH0(STATE)) == S_ENDED);
 	vf->close(vf);
 	unload(core);
@@ -133,16 +133,16 @@ static void gxa_state_pack_changed(void) {
 
 static void gxa_state_without_extdata(void) {
 	struct mCore* core = load();
-	struct VFile* vf = VFileMemChunk(NULL, 0);
-	CHECK(mCoreSaveStateNamed(core, vf, 0));
 	core->busWrite16(core, REG(0xA), 100);
 	play(core, 1);
 	run(core, 2, NULL);
-	vf->seek(vf, 0, SEEK_SET);
-	CHECK(mCoreLoadStateNamed(core, vf, SAVESTATE_GXA));
+	// what a state saved before GXA existed carries: no GXA item
+	struct mStateExtdata old;
+	mStateExtdataInit(&old);
+	core->loadExtraState(core, &old);
+	mStateExtdataDeinit(&old);
 	CHECK(core->busRead16(core, CH0(STATE)) == 0);
 	CHECK(core->busRead16(core, REG(0xA)) == 256);
-	vf->close(vf);
 	unload(core);
 }
 

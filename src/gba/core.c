@@ -13,6 +13,7 @@
 #include <mgba/internal/debugger/symbols.h>
 #include <mgba/internal/gba/cheats.h>
 #include <mgba/internal/gba/gba.h>
+#include <mgba/internal/gba/gxa.h>
 #include <mgba/internal/gba/io.h>
 #include <mgba/internal/gba/debugger/cli.h>
 #include <mgba/internal/gba/overrides.h>
@@ -956,11 +957,20 @@ static bool _GBACoreLoadExtraState(struct mCore* core, const struct mStateExtdat
 			memset(high, 0, ewramHigh);
 		}
 	}
+	if (gba->gxa) {
+		// a state from before GXA (or from a core without it) resets GXA to idle
+		GXADeserialize(gba->gxa, mStateExtdataGet(extdata, EXTDATA_SUBSYSTEM_START + GBA_SUBSYSTEM_GXA, &item) ? &item : NULL);
+	}
 	return ok;
 }
 
 static bool _GBACoreSaveExtraState(struct mCore* core, struct mStateExtdata* extdata) {
 	struct GBA* gba = core->board;
+	if (gba->gxa) {
+		struct mStateExtdataItem item;
+		GXASerialize(gba->gxa, &item);
+		mStateExtdataPut(extdata, EXTDATA_SUBSYSTEM_START + GBA_SUBSYSTEM_GXA, &item);
+	}
 	void* buffer = NULL;
 	size_t size = 0;
 	gba->video.renderer->saveState(gba->video.renderer, &buffer, &size);

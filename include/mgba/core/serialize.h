@@ -18,7 +18,6 @@ enum mStateExtdataTag {
 	EXTDATA_RTC = 4,
 	EXTDATA_SCREENSHOT_DIMENSIONS = 5,
 	EXTDATA_SUBSYSTEM_START = 0x40,
-	EXTDATA_GXA = EXTDATA_SUBSYSTEM_START + 0x20,
 	EXTDATA_SUBSYSTEM_MAX = 0x7F,
 	EXTDATA_META_TIME = 0x101,
 	EXTDATA_META_CREATOR = 0x102,
@@ -30,8 +29,7 @@ enum mStateExtdataTag {
 #define SAVESTATE_CHEATS     4
 #define SAVESTATE_RTC        8
 #define SAVESTATE_METADATA   16
-#define SAVESTATE_GXA        32
-#define SAVESTATE_ALL        63
+#define SAVESTATE_ALL        31
 
 struct mStateExtdataItem {
 	int32_t size;
