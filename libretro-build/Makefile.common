@@ -101,6 +101,8 @@ SOURCES_C :=   $(CORE_DIR)/src/arm/arm.c \
 					$(CORE_DIR)/src/gba/core.c \
 					$(CORE_DIR)/src/gba/dma.c \
 					$(CORE_DIR)/src/gba/gba.c \
+					$(CORE_DIR)/src/gba/gxa.c \
+					$(CORE_DIR)/src/gba/gxa-pack.c \
 					$(CORE_DIR)/src/gba/cart/gpio.c \
 					$(CORE_DIR)/src/gba/cart/ereader.c \
 					$(CORE_DIR)/src/gba/cart/unlicensed.c \
