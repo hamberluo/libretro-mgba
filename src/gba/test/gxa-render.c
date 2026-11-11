@@ -197,6 +197,29 @@ static void gxa_render_mixed_formats(void) {
 	GXADestroy(gxa);
 }
 
+// GXASkip keeps only the newest frames: a backlog the mix could not take is dropped, not played late
+static void gxa_render_skip(void) {
+	struct GXA* gxa = create();
+	play(gxa, 0, 1, 1);
+	GXAProduce(gxa, 3000, RATE);
+	GXASkip(gxa, 1000);
+	CHECK(GXAAvailable(gxa) == 1000);
+	int16_t a[2000 * 2], b[2];
+	CHECK(GXARead(gxa, a, 2000) == 1000);
+	struct GXA* ref = create();
+	play(ref, 0, 1, 1);
+	run(ref, out, 3000, RATE);
+	size_t i;
+	int same = 1;
+	for (i = 0; i < 1000; ++i) {
+		same &= a[i * 2] == out[2000 + i];
+	}
+	CHECK(same);
+	CHECK(GXARead(gxa, b, 1) == 0);
+	GXADestroy(ref);
+	GXADestroy(gxa);
+}
+
 int main(void) {
 	gxa_render_tone();
 	gxa_render_end();
@@ -206,6 +229,7 @@ int main(void) {
 	gxa_render_inaudible();
 	gxa_render_rate_change();
 	gxa_render_mixed_formats();
+	gxa_render_skip();
 	printf("gxa-render: %s\n", failures ? "FAILED" : "ok");
 	return failures ? 1 : 0;
 }

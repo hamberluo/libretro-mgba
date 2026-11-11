@@ -10,6 +10,11 @@
 // Frontends resolve these with dlsym; other cores lack them. Without a call to
 // retro_gxa_load, retro_load_game loads <rom path without extension>.gxa when
 // it exists.
+//
+// Only the main core has GXA. Aux cores (link partners, realtime BGM's
+// shadows, which run only injected calls into the game's sound driver) fail
+// the handshake: a sound driver that drives GXA itself would not be heard
+// while realtime BGM takes over a fast-forward.
 
 #include <stdbool.h>
 #include <stddef.h>

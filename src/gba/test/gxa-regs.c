@@ -132,6 +132,24 @@ static void gxa_regs_gain(void) {
 	unload(core);
 }
 
+// 0x50-0x7F is reserved: past channel 3, nothing there may be read or written
+static void gxa_regs_reserved(void) {
+	struct mCore* core = load(true, true);
+	core->busWrite16(core, CH(0, TRACK), 2);
+	core->busWrite16(core, CH(0, CTRL), 2);
+	struct GXA* gxa = ((struct GBA*) core->board)->gxa;
+	GXAProduce(gxa, 4000, 32768);
+	uint32_t off;
+	for (off = 0x50; off < 0x80; off += 2) {
+		core->busWrite16(core, REG(off), 3);
+	}
+	for (off = 0x50; off < 0x80; off += 2) {
+		CHECK(core->busRead16(core, REG(off)) == 0);
+	}
+	CHECK(core->busRead16(core, CH(0, STATE)) == S_PLAYING);
+	unload(core);
+}
+
 int main(void) {
 	memcpy(&rom[0xA0], "GXA TEST", 8);
 	memcpy(&rom[0xAC], "GXAT", 4);
@@ -142,6 +160,7 @@ int main(void) {
 	gxa_regs_no_pack();
 	gxa_regs_store32();
 	gxa_regs_gain();
+	gxa_regs_reserved();
 	printf("gxa-regs: %s\n", failures ? "FAILED" : "ok");
 	return failures ? 1 : 0;
 }

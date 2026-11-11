@@ -183,6 +183,22 @@ static void gxa_libretro_duck(void) {
 	retro_unload_game();
 }
 
+// a console reset puts every register back: GAMEVOL 256, channels idle
+static void gxa_libretro_reset(void) {
+	load("GXAT");
+	retro_gxa_load(fixture);
+	struct mCore* core = RetroCoreForTesting();
+	core->busWrite16(core, REG(0xA), 0);
+	play(1, 100);
+	retro_run();
+	retro_reset();
+	CHECK(core->busRead16(core, REG(0xA)) == 256);
+	CHECK(core->busRead16(core, REG(0x14)) == 256);
+	CHECK(core->busRead16(core, REG(0x18)) == 0);
+	CHECK(core->busRead16(core, REG(8)) == 0x0401);
+	retro_unload_game();
+}
+
 static void gxa_libretro_autoload(void) {
 	char dir[] = "/tmp/gxa-libretro-XXXXXX";
 	CHECK(mkdtemp(dir));
@@ -227,6 +243,7 @@ int main(void) {
 	gxa_libretro_mix();
 	gxa_libretro_volume();
 	gxa_libretro_duck();
+	gxa_libretro_reset();
 	gxa_libretro_autoload();
 	retro_deinit();
 	printf("gxa-libretro: %s\n", failures ? "FAILED" : "ok");

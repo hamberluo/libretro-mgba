@@ -36,6 +36,8 @@ track and then plays it.
 | `0x0C` | `DUCK` | RW | `256` | While any channel is playing, the GBA's own sound is scaled by `GAMEVOL × DUCK / 256` |
 
 Values above 256 written to `GAMEVOL`, `DUCK` or `VOL` read back as 256.
+`0x50`–`0x7F` is reserved: it reads 0 and ignores writes. A console reset
+puts every register back to its reset value and stops every channel.
 
 ### Channel registers
 

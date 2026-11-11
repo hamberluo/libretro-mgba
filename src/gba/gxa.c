@@ -215,8 +215,8 @@ uint16_t GXARead16(struct GXA* gxa, uint32_t offset) {
 	case REG_DUCK:
 		return gxa->duck;
 	}
-	if (offset < REG_CHANNEL0) {
-		return 0;
+	if (offset < REG_CHANNEL0 || offset >= REG_CHANNEL0 + 0x10 * GXA_CHANNELS) {
+		return 0;   // 0x50-0x7F reserved
 	}
 	struct GXAChannel* c = &gxa->ch[(offset - REG_CHANNEL0) >> 4];
 	switch (offset & 0xF) {
@@ -252,7 +252,7 @@ void GXAWrite16(struct GXA* gxa, uint32_t offset, uint16_t value) {
 		gxa->duck = _q8(value);
 		return;
 	}
-	if (offset < REG_CHANNEL0) {
+	if (offset < REG_CHANNEL0 || offset >= REG_CHANNEL0 + 0x10 * GXA_CHANNELS) {
 		return;
 	}
 	struct GXAChannel* c = &gxa->ch[(offset - REG_CHANNEL0) >> 4];
@@ -393,6 +393,13 @@ size_t GXARead(struct GXA* gxa, int16_t* stereo, size_t maxFrames) {
 		++n;
 	}
 	return n;
+}
+
+void GXASkip(struct GXA* gxa, size_t keep) {
+	if (gxa->ringCount > keep) {
+		gxa->ringRead = (gxa->ringRead + gxa->ringCount - keep) % GXA_RING;
+		gxa->ringCount = keep;
+	}
 }
 
 size_t GXAAvailable(const struct GXA* gxa) {

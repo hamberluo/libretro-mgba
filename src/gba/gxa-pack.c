@@ -56,6 +56,11 @@ static uint32_t _le32(const uint8_t* p) {
 	return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t) p[3] << 24);
 }
 
+// offset + len <= size, without the sum wrapping on 32-bit hosts (packs are untrusted)
+static bool _fits(size_t offset, size_t len, size_t size) {
+	return offset <= size && len <= size - offset;
+}
+
 // The central directory's entries; false on anything but a plain store-only zip.
 static bool _readZip(const uint8_t* z, size_t size, struct GXAEntry** out, size_t* count) {
 	if (size < 22) {
@@ -74,7 +79,7 @@ static bool _readZip(const uint8_t* z, size_t size, struct GXAEntry** out, size_
 	struct GXAEntry* entries = calloc(n ? n : 1, sizeof(*entries));
 	size_t i;
 	for (i = 0; i < n; ++i) {
-		if (cd + 46 > size || _le32(&z[cd]) != 0x02014B50) {
+		if (!_fits(cd, 46, size) || _le32(&z[cd]) != 0x02014B50) {
 			break;
 		}
 		uint16_t method = _le16(&z[cd + 10]);
@@ -83,11 +88,12 @@ static bool _readZip(const uint8_t* z, size_t size, struct GXAEntry** out, size_
 		size_t nameLen = _le16(&z[cd + 28]);
 		size_t skip = 46 + nameLen + _le16(&z[cd + 30]) + _le16(&z[cd + 32]);
 		size_t local = _le32(&z[cd + 42]);
-		if (method != 0 || csize != usize || cd + skip > size || local + 30 > size || _le32(&z[local]) != 0x04034B50) {
+		if (method != 0 || csize != usize || !_fits(cd, skip, size) || !_fits(local, 30, size) ||
+		    _le32(&z[local]) != 0x04034B50) {
 			break;
 		}
-		size_t data = local + 30 + _le16(&z[local + 26]) + _le16(&z[local + 28]);
-		if (data + csize > size) {
+		size_t data = local + 30 + _le16(&z[local + 26]) + _le16(&z[local + 28]);   // <= size + 2 * 0xFFFF
+		if (!_fits(data, csize, size)) {
 			break;
 		}
 		entries[i] = (struct GXAEntry) { (const char*) &z[cd + 46], nameLen, &z[data], csize };

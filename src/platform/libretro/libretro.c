@@ -2154,7 +2154,7 @@ void retro_reset(void) {
 	}
 	core->reset(core);
 	if (gxa) {
-		GXASetPack(gxa, GXAGetPack(gxa));   // a reset stops every channel
+		GXADeserialize(gxa, NULL);   // a reset puts every register back, pack kept
 	}
 	RetroRewindClear(&rewindRing);
 	_realtimeBgmMainJumped();
@@ -2255,6 +2255,9 @@ static struct mAudioBuffer* _gxaMixInto(struct mAudioBuffer* game) {
 		}
 		mAudioBufferWrite(&gxaMix, g, n);
 	}
+	// GXA renders on the main core's clock; whatever the game side did not hand over this time (a shorter
+	// realtime BGM lane) would only pile up as latency: keep ~1 video frame at most
+	GXASkip(gxa, 1024);
 	return &gxaMix;
 }
 

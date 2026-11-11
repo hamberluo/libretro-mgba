@@ -51,6 +51,8 @@ int32_t GXAGameGain(const struct GXA*);
 void GXAProduce(struct GXA*, unsigned frames, unsigned rate);
 size_t GXARead(struct GXA*, int16_t* stereo, size_t maxFrames);
 size_t GXAAvailable(const struct GXA*);
+// Drops the oldest rendered frames so that at most keep remain.
+void GXASkip(struct GXA*, size_t keep);
 struct mStateExtdataItem;
 // The state as an extdata item (GBA_SUBSYSTEM_GXA); NULL to deserialize resets GXA to idle. Channels
 // of another pack (or none) read ended.
