@@ -25,6 +25,7 @@
 #include <mgba/gba/core.h>
 #include <mgba/gba/interface.h>
 #include <mgba/internal/gba/gba.h>
+#include <mgba/internal/gba/gxa.h>
 #endif
 #include <mgba-util/memory.h>
 #include <mgba-util/vfs.h>
@@ -46,6 +47,7 @@ FS_Archive sdmcArchive;
 
 #include "libretro_core_options.h"
 #include "libretro_bgm.h"
+#include "libretro_gxa.h"
 #include "libretro_link.h"
 #include "libretro_rewind.h"
 #include "realtime-bgm.h"
@@ -122,6 +124,16 @@ static size_t dataSize;
 static void* savedata;
 static size_t savedataSize;
 static char romPath[PATH_MAX];      // for link mode when the frontend passed a path
+
+// GXA (libretro_gxa.h): attached to every GBA main core, a pack or not.
+static struct GXA* gxa;
+static int gxaStatus;
+static float gxaVolume = 1.f;
+static bool gxaAudible = true;
+static struct mAudioBuffer gxaMix;
+static bool gxaMixReady;
+static void _gxaDetach(void);
+static struct mAudioBuffer* _gxaMixInto(struct mAudioBuffer* game);
 static struct RetroLink* activeLink; // not `link`: that would clash with POSIX link() from <unistd.h>
 static struct RetroRewind rewindRing;
 static void* linkSaves[RETRO_LINK_MAX_PLAYERS]; // remote players' save buffers
@@ -1628,6 +1640,11 @@ void retro_init(void) {
 void retro_deinit(void) {
 	RetroRewindConfigure(&rewindRing, 0);
 	_realtimeBgmUnload();
+	_gxaDetach();
+	if (gxaMixReady) {
+		mAudioBufferDeinit(&gxaMix);
+		gxaMixReady = false;
+	}
 	if (outputBuffer) {
 #ifdef _3DS
 		linearFree(outputBuffer);
@@ -1898,6 +1915,9 @@ void retro_run(void) {
 		if (realtimeBgm) {
 			coreBuffer = RealtimeBgmGameAudio(realtimeBgm, coreBuffer);
 		}
+		if (gxa) {
+			coreBuffer = _gxaMixInto(coreBuffer);
+		}
         int coreSamplesAvail = mAudioBufferAvailable(coreBuffer);
         if (coreSamplesAvail > 0) {
             unsigned coreSampleRate = shown->audioSampleRate(shown);
@@ -2133,6 +2153,9 @@ void retro_reset(void) {
 		return;
 	}
 	core->reset(core);
+	if (gxa) {
+		GXASetPack(gxa, GXAGetPack(gxa));   // a reset stops every channel
+	}
 	RetroRewindClear(&rewindRing);
 	_realtimeBgmMainJumped();
 	mRumbleIntegratorReset(&rumble);
@@ -2173,6 +2196,71 @@ error:
 	return -1;
 }
 #endif
+
+static void _gxaDetach(void) {
+	if (!gxa) {
+		return;
+	}
+	if (core && core->platform(core) == mPLATFORM_GBA) {
+		((struct GBA*) core->board)->gxa = NULL;
+	}
+	GXADestroy(gxa);
+	gxa = NULL;
+	gxaStatus = RETRO_GXA_NONE;
+}
+
+static void _gxaAttach(const char* path) {
+	gxaStatus = RETRO_GXA_NONE;
+	if (core->platform(core) != mPLATFORM_GBA) {
+		return;
+	}
+	gxa = GXACreate();
+	GXASetAudible(gxa, gxaAudible);
+	((struct GBA*) core->board)->gxa = gxa;
+	if (!path) {
+		return;
+	}
+	char pack[PATH_MAX];
+	strlcpy(pack, path, sizeof(pack));
+	char* dot = strrchr(pack, '.');
+	char* slash = strrchr(pack, '/');
+	if (dot && (!slash || dot > slash)) {
+		*dot = '\0';
+	}
+	strlcat(pack, ".gxa", sizeof(pack));
+	struct VFile* vf = VFileOpen(pack, O_RDONLY);
+	if (vf) {
+		vf->close(vf);
+		retro_gxa_load(pack);
+	}
+}
+
+// The game's frames scaled by GXA's game gain, plus as many GXA frames: both run on the main core's clock.
+static struct mAudioBuffer* _gxaMixInto(struct mAudioBuffer* game) {
+	enum { CHUNK = 1024 };
+	int16_t g[CHUNK * 2], x[CHUNK * 2];
+	if (!gxaMixReady) {
+		mAudioBufferInit(&gxaMix, 0x4000, 2);
+		gxaMixReady = true;
+	}
+	int32_t gain = GXAGameGain(gxa);
+	int32_t vol = (int32_t) (gxaVolume * 256);
+	size_t n;
+	while ((n = mAudioBufferRead(game, g, CHUNK)) > 0) {
+		size_t got = GXARead(gxa, x, n);
+		size_t i;
+		for (i = 0; i < n * 2; ++i) {
+			int32_t s = g[i] * gain / 256 + (i < got * 2 ? x[i] * vol / 256 : 0);
+			g[i] = s > 32767 ? 32767 : s < -32768 ? -32768 : s;
+		}
+		mAudioBufferWrite(&gxaMix, g, n);
+	}
+	return &gxaMix;
+}
+
+struct mCore* RetroCoreForTesting(void) {
+	return core;
+}
 
 bool retro_load_game(const struct retro_game_info* game) {
 	struct VFile* rom;
@@ -2364,6 +2452,7 @@ bool retro_load_game(const struct retro_game_info* game) {
 	}
 #endif
 
+	_gxaAttach(game->path);
 	// After the BIOS: the shadows are built now and must run the same one.
 	_realtimeBgmLoad();
 	return true;
@@ -2376,6 +2465,7 @@ void retro_unload_game(void) {
 	RetroRewindConfigure(&rewindRing, 0);
 	_linkEnd();
 	_realtimeBgmUnload();
+	_gxaDetach();
 	mCoreConfigDeinit(&core->config);
 	core->deinit(core);
 	// deinit frees the core, so clear the pointer with the rest: the guard
@@ -3189,9 +3279,78 @@ RETRO_API void retro_bgm_run(unsigned frames) {
 }
 
 RETRO_API size_t retro_bgm_read(int16_t* out, size_t max_frames) {
-	return realtimeBgm ? RealtimeBgmRead(realtimeBgm, out, max_frames) : 0;
+	size_t n = realtimeBgm ? RealtimeBgmRead(realtimeBgm, out, max_frames) : 0;
+	if (gxa) {
+		// the music is the game's own sound: GAMEVOL and DUCK apply
+		int32_t gain = GXAGameGain(gxa);
+		size_t i;
+		for (i = 0; i < n * 2; ++i) {
+			out[i] = out[i] * gain / 256;
+		}
+	}
+	return n;
 }
 
 RETRO_API bool retro_bgm_active(void) {
 	return realtimeBgm && RealtimeBgmActive(realtimeBgm);
+}
+
+/* GXA: see libretro_gxa.h. */
+RETRO_API int retro_gxa_load(const char* path) {
+	if (!core || !gxa) {
+		gxaStatus = RETRO_GXA_NOT_GBA;
+		return gxaStatus;
+	}
+	GXASetPack(gxa, NULL);
+	struct GXAPack* pack = GXAPackOpen(path ? VFileOpen(path, O_RDONLY) : NULL);
+	if (!pack) {
+		gxaStatus = RETRO_GXA_BAD_PACK;
+		return gxaStatus;
+	}
+	struct GBA* gba = core->board;
+	enum GXAMatch match = GXAPackMatch(pack, gba->memory.rom, gba->memory.romSize);
+	if (match == GXA_MATCH_NONE) {
+		GXAPackClose(pack);
+		gxaStatus = RETRO_GXA_NO_MATCH;
+		return gxaStatus;
+	}
+	GXASetPack(gxa, pack);
+	gxaStatus = match == GXA_MATCH_SHA1 ? RETRO_GXA_OK : RETRO_GXA_HEADER_ONLY;
+	return gxaStatus;
+}
+
+RETRO_API void retro_gxa_unload(void) {
+	if (gxa) {
+		GXASetPack(gxa, NULL);
+	}
+	gxaStatus = RETRO_GXA_NONE;
+}
+
+RETRO_API void retro_gxa_set_audible(bool audible) {
+	gxaAudible = audible;
+	if (gxa) {
+		GXASetAudible(gxa, audible);
+	}
+}
+
+RETRO_API void retro_gxa_set_volume(float volume) {
+	gxaVolume = volume < 0 ? 0 : volume > 1 ? 1 : volume;
+}
+
+RETRO_API int retro_gxa_status(void) {
+	return gxaStatus;
+}
+
+RETRO_API bool retro_gxa_pack_info(char* title, size_t titleSize, char* version, size_t versionSize) {
+	struct GXAPack* pack = gxa ? GXAGetPack(gxa) : NULL;
+	if (!pack) {
+		return false;
+	}
+	if (title && titleSize) {
+		strlcpy(title, GXAPackTitle(pack), titleSize);
+	}
+	if (version && versionSize) {
+		strlcpy(version, GXAPackVersion(pack), versionSize);
+	}
+	return true;
 }
