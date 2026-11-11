@@ -8,7 +8,8 @@
 #include <mgba-util/sha1.h>
 #include <mgba-util/vfs.h>
 
-#include "third-party/cjson/cJSON.h"
+// cJSON is compiled here, so builds that take src/gba/*.c need no extra source
+#include "third-party/cjson/cJSON.c"
 
 #define GXA_MAX_MATCH 16
 

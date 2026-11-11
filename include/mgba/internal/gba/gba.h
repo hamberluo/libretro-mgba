@@ -52,6 +52,7 @@ enum {
 
 struct ARMCore;
 struct GBA;
+struct GXA;
 struct Patch;
 struct VFile;
 
@@ -124,6 +125,7 @@ struct GBA {
 
 	bool debug;
 	char debugString[0x100];
+	struct GXA* gxa; // external audio (gba/gxa.h); NULL: none, the handshake fails
 	GBADebugFlags debugFlags;
 };
 

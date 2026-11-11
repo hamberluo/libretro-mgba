@@ -36,6 +36,18 @@ void GXAPackId(const struct GXAPack*, uint8_t out[20]);
 const char* GXAPackTitle(const struct GXAPack*);
 const char* GXAPackVersion(const struct GXAPack*);
 
+struct GXA;
+
+struct GXA* GXACreate(void);
+void GXADestroy(struct GXA*);
+// Takes ownership; NULL unloads. Every channel stops and reads ended.
+void GXASetPack(struct GXA*, struct GXAPack*);
+struct GXAPack* GXAGetPack(const struct GXA*);
+uint16_t GXARead16(struct GXA*, uint32_t offset);
+void GXAWrite16(struct GXA*, uint32_t offset, uint16_t value);
+// Q8 (256 = unity): GAMEVOL, times DUCK while any channel plays.
+int32_t GXAGameGain(const struct GXA*);
+
 CXX_GUARD_END
 
 #endif

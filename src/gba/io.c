@@ -8,6 +8,7 @@
 #include <mgba/internal/arm/macros.h>
 #include <mgba/internal/gba/dma.h>
 #include <mgba/internal/gba/gba.h>
+#include <mgba/internal/gba/gxa.h>
 #include <mgba/internal/gba/serialize.h>
 
 mLOG_DEFINE_CATEGORY(GBA_IO, "GBA I/O", "gba.io");
@@ -298,6 +299,10 @@ void GBAIOInit(struct GBA* gba) {
 }
 
 void GBAIOWrite(struct GBA* gba, uint32_t address, uint16_t value) {
+	if (gba->gxa && address - GXA_BASE < GXA_SIZE) {
+		GXAWrite16(gba->gxa, address - GXA_BASE, value);
+		return;
+	}
 	if (address < GBA_REG_SOUND1CNT_LO && (address > GBA_REG_VCOUNT || address < GBA_REG_DISPSTAT)) {
 		gba->memory.io[address >> 1] = gba->video.renderer->writeVideoRegister(gba->video.renderer, address, value);
 		return;
@@ -574,6 +579,10 @@ void GBAIOWrite(struct GBA* gba, uint32_t address, uint16_t value) {
 }
 
 void GBAIOWrite8(struct GBA* gba, uint32_t address, uint8_t value) {
+	if (address - GXA_BASE < GXA_SIZE) {
+		// GXA defines 16- and 32-bit access only; merged into a halfword this would hit IE (io[0x200])
+		return;
+	}
 	if (address >= GBA_REG_DEBUG_STRING && address - GBA_REG_DEBUG_STRING < sizeof(gba->debugString)) {
 		gba->debugString[address - GBA_REG_DEBUG_STRING] = value;
 		return;
@@ -767,6 +776,9 @@ bool GBAIOIsReadConstant(uint32_t address) {
 }
 
 uint16_t GBAIORead(struct GBA* gba, uint32_t address) {
+	if (gba->gxa && address - GXA_BASE < GXA_SIZE) {
+		return GXARead16(gba->gxa, address - GXA_BASE);
+	}
 	if (!GBAIOIsReadConstant(address)) {
 		// Most IO reads need to disable idle removal
 		gba->haltPending = false;
