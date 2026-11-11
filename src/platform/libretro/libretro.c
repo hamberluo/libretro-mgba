@@ -3318,7 +3318,7 @@ RETRO_API int retro_gxa_load(const char* path) {
 		return gxaStatus;
 	}
 	GXASetPack(gxa, pack);
-	gxaStatus = match == GXA_MATCH_SHA1 ? RETRO_GXA_OK : RETRO_GXA_HEADER_ONLY;
+	gxaStatus = match == GXA_MATCH_HEADER ? RETRO_GXA_HEADER_ONLY : RETRO_GXA_OK;
 	return gxaStatus;
 }
 

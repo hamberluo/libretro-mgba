@@ -104,3 +104,8 @@ def test_rejects_loop_past_end(tmp_path):
 def test_rejects_empty_match(tmp_path):
     r = broken(tmp_path, lambda m: m.update(match=[]))
     assert r.returncode != 0 and 'match' in r.stderr
+
+
+def test_rejects_bad_version(tmp_path):
+    r = broken(tmp_path, lambda m: m.update(match=[{'code': 'GXAT', 'title': 'GXA TEST', 'version': [5, 2]}]))
+    assert r.returncode != 0 and 'version' in r.stderr

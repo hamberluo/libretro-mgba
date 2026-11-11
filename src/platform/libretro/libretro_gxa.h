@@ -27,8 +27,8 @@ extern "C" {
 
 enum retro_gxa_status {
 	RETRO_GXA_NONE = 0,
-	RETRO_GXA_OK = 1,          // matched by the ROM's SHA-1
-	RETRO_GXA_HEADER_ONLY = 2, // matched by game code and title only: maybe another version
+	RETRO_GXA_OK = 1,          // matched by the ROM's SHA-1, or by its header and a version the pack names
+	RETRO_GXA_HEADER_ONLY = 2, // matched by game code and title only (no version, or one outside the pack's)
 	RETRO_GXA_NO_MATCH = 3,
 	RETRO_GXA_BAD_PACK = 4,
 	RETRO_GXA_NOT_GBA = 5,

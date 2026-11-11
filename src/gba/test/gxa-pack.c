@@ -91,8 +91,32 @@ static void gxa_pack_match(void) {
 	GXAPackClose(bySha);
 }
 
+// a header rule with a version range (ROM header 0xBC): in range is a full match, out of range only a header match
+static void gxa_pack_version(void) {
+	uint8_t rom[192];
+	struct GXAPack* pack = openFixture("version.gxa");
+	CHECK(pack);
+	if (!pack) {
+		return;
+	}
+	testRom(rom, "GXAT");
+	const uint8_t want[][2] = { { 1, GXA_MATCH_HEADER }, { 2, GXA_MATCH_VERSION }, { 5, GXA_MATCH_VERSION }, { 6, GXA_MATCH_HEADER } };
+	size_t i;
+	for (i = 0; i < sizeof(want) / sizeof(*want); ++i) {
+		rom[0xBC] = want[i][0];
+		CHECK(GXAPackMatch(pack, rom, sizeof(rom)) == want[i][1]);
+	}
+	testRom(rom, "GXAV");   // a bare number: that version and later
+	rom[0xBC] = 2;
+	CHECK(GXAPackMatch(pack, rom, sizeof(rom)) == GXA_MATCH_HEADER);
+	rom[0xBC] = 255;
+	CHECK(GXAPackMatch(pack, rom, sizeof(rom)) == GXA_MATCH_VERSION);
+	GXAPackClose(pack);
+}
+
 int main(void) {
 	gxa_pack_tracks();
+	gxa_pack_version();
 	gxa_pack_rejects();
 	gxa_pack_match();
 	printf("gxa-pack: %s\n", failures ? "FAILED" : "ok");

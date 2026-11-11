@@ -26,6 +26,7 @@ struct GXAMatchRule {
 	uint8_t digest[20];
 	char code[4];
 	char title[13];
+	int lo, hi;   // version range at 0xBC; lo < 0: none given
 };
 
 struct GXAPack {
@@ -175,6 +176,20 @@ static bool _manifest(struct GXAPack* pack, const struct GXAEntry* m, const stru
 		} else if (cJSON_IsString(code) && strlen(code->valuestring) == 4 && cJSON_IsString(title)) {
 			memcpy(r->code, code->valuestring, 4);
 			strlcpy(r->title, title->valuestring, sizeof(r->title));
+			const cJSON* v = cJSON_GetObjectItemCaseSensitive(rule, "version");
+			r->lo = -1;
+			if (cJSON_IsNumber(v)) {
+				r->lo = v->valueint;
+				r->hi = 255;
+			} else if (cJSON_IsArray(v) && cJSON_GetArraySize(v) == 2 && cJSON_IsNumber(cJSON_GetArrayItem(v, 0)) && cJSON_IsNumber(cJSON_GetArrayItem(v, 1))) {
+				r->lo = cJSON_GetArrayItem(v, 0)->valueint;
+				r->hi = cJSON_GetArrayItem(v, 1)->valueint;
+			} else if (v) {
+				goto done;
+			}
+			if (v && (r->lo < 0 || r->hi > 255 || r->lo > r->hi)) {
+				goto done;
+			}
 		} else {
 			goto done;
 		}
@@ -255,7 +270,7 @@ enum GXAMatch GXAPackMatch(const struct GXAPack* pack, const void* rom, size_t s
 			if (!memcmp(r->digest, digest, 20)) {
 				return GXA_MATCH_SHA1;
 			}
-		} else if (size >= 0xB0) {
+		} else if (size >= 0xBD) {
 			const char* h = rom;
 			char title[13] = { 0 };
 			memcpy(title, &h[0xA0], 12);
@@ -264,7 +279,12 @@ enum GXAMatch GXAPackMatch(const struct GXAPack* pack, const void* rom, size_t s
 				title[--len] = '\0';
 			}
 			if (!memcmp(&h[0xAC], r->code, 4) && !strcmp(title, r->title)) {
-				best = GXA_MATCH_HEADER;
+				uint8_t version = h[0xBC];
+				if (r->lo >= 0 && version >= r->lo && version <= r->hi) {
+					best = GXA_MATCH_VERSION;
+				} else if (best < GXA_MATCH_HEADER) {
+					best = GXA_MATCH_HEADER;
+				}
 			}
 		}
 	}

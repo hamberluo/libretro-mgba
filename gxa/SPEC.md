@@ -121,7 +121,7 @@ A pack is a zip file with the extension `.gxa`.
   "license": "...",
   "match": [
     { "sha1": "0123456789abcdef0123456789abcdef01234567" },
-    { "code": "ZL2J", "title": "LANGRISSER2" }
+    { "code": "ZL2J", "title": "LANGRISSER2", "version": [1, 4] }
   ],
   "tracks": {
     "1": { "file": "voice/0001.ogg" },
@@ -140,10 +140,27 @@ A pack is a zip file with the extension `.gxa`.
   - `sha1`: the SHA-1 of the whole ROM file.
   - `code` + `title`: the game code at `0xAC` and the title at `0xA0`.
     Trailing spaces and NULs in the title are ignored.
+  - `version` (optional, with `code` + `title`): the header's version byte at
+    `0xBC`, as a number (that version and later) or `[min, max]`, 0–255.
 
-When a pack matches only by header, the ROM may be a different version than
-the one the pack was made for. A frontend SHOULD tell the player so, and MAY
-still load it.
+A pack matches fully by `sha1`, or by `code` + `title` with the ROM's version
+in the rule's `version`. When it matches only by header (no `version`, or one
+outside it), the ROM may be a different version than the one the pack was
+made for. A frontend SHOULD tell the player so, and MAY still load it.
+
+### Updating a game
+
+A game has one pack. When the game's content changes, its author re-releases
+the whole pack; players import the new one in place of the old.
+
+- Track ids are the game's: once a released ROM plays an id, the id keeps its
+  meaning. New audio takes new ids; audio that changes meaning (a rewritten
+  line) takes a new id, and its old id is never reused.
+- A ROM release bumps the header's version byte. A pack that still fits the
+  new ROM names it in `version` (`"version": 1` covers every later one); a
+  pack for the new content names the versions it was made for.
+- A newer ROM with an older pack plays what the pack holds: the tracks it
+  lacks read missing, and the ROM carries on as without GXA for those.
 
 `gxa/tools/gxa_pack.py` builds a pack from a directory. It encodes WAV and
 FLAC files, checks every rule above, and writes stored entries.

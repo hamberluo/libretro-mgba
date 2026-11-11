@@ -39,6 +39,11 @@ def build(src, out, quality=0.4):
         errors.append('spec must be 1')
     if not m.get('match'):
         errors.append('match is empty: no ROM would ever load this pack')
+    for rule in m.get('match', []):
+        v = rule.get('version')
+        lo, hi = (v, 255) if isinstance(v, int) else (v if isinstance(v, list) and len(v) == 2 else (-1, -1))
+        if 'version' in rule and not (isinstance(lo, int) and isinstance(hi, int) and 0 <= lo <= hi <= 255):
+            errors.append('match version must be 0-255 or [min, max] within it: %r' % (v,))
     entries = {}
     tracks = {}
     for key, t in m.get('tracks', {}).items():

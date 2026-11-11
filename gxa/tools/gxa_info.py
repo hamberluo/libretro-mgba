@@ -19,7 +19,7 @@ def main():
     print('version: %s' % m.get('version', ''))
     print('license: %s' % m.get('license', ''))
     for rule in m.get('match', []):
-        print('match: %s' % ('sha1 ' + rule['sha1'] if 'sha1' in rule else '%s "%s"' % (rule['code'], rule['title'])))
+        print('match: %s' % ('sha1 ' + rule['sha1'] if 'sha1' in rule else '%s "%s"%s' % (rule['code'], rule['title'], ' version %s' % (rule['version'],) if 'version' in rule else '')))
     secs = 0.0
     for t in m.get('tracks', {}).values():
         info = sf.info(io.BytesIO(z.read(t['file'])))

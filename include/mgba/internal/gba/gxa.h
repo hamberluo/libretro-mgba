@@ -23,7 +23,8 @@ struct GXAPack;
 enum GXAMatch {
 	GXA_MATCH_NONE = 0,
 	GXA_MATCH_SHA1,
-	GXA_MATCH_HEADER,
+	GXA_MATCH_HEADER,    // game code and title only: maybe another version
+	GXA_MATCH_VERSION,   // game code, title and a version (0xBC) the rule names
 };
 
 // Takes ownership of vf; NULL on a bad zip, a compressed entry, a bad manifest or spec != 1.
