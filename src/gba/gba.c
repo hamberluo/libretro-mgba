@@ -487,6 +487,10 @@ bool GBALoadROM(struct GBA* gba, struct VFile* vf) {
 #ifndef FIXED_ROM_BUFFER
 		void* newRom = anonymousMemoryMap((size_t) gba->memory.romBusMask + 1);
 		memcpy(newRom, gba->memory.rom, gba->pristineRomSize);
+		if (gba->isPristine) {
+			// as GBAApplyPatch does: the copy replaces the file mapping
+			vf->unmap(vf, gba->memory.rom, gba->pristineRomSize);
+		}
 		gba->memory.rom = newRom;
 #endif
 		gba->memory.romSize = (size_t) gba->memory.romBusMask + 1;
