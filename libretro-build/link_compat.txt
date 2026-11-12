@@ -106,3 +106,5 @@ d93a5637280431e7 3b52706bfa2141f6
 # never attach GXA and link_begin detaches it; link-compat passes, 2P frames untouched.
 8633fedf7a4042c6 3b52706bfa2141f6
 b0d2f675f2fce45a 3b52706bfa2141f6
+# ROM file unmapped after the padded copy (memory only); link-compat passes.
+32527219f138632e 3b52706bfa2141f6
