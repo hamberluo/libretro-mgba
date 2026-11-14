@@ -15,11 +15,15 @@
 #include "link-rom.h"
 #include "realtime-bgm-rom.h"
 
+#include <mgba/core/core.h>
 #include <mgba-util/common.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+struct mCore* RetroCoreForTesting(void);
 
 static int failures;
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "%s:%d: CHECK(%s)\n", __FILE__, __LINE__, #c); ++failures; } } while (0)
@@ -63,19 +67,23 @@ static void put32(uint32_t address, uint32_t value) {
 	memcpy(&iwram[address - 0x03000000], &value, 4);
 }
 
-static void loadBgmRom(const struct RealtimeBgmM4a* stubs) {
+static void loadBgmRomFrom(const struct RealtimeBgmM4a* stubs, const char* path) {
 	RealtimeBgmSetLocateOverrideForTesting(stubs);
-	struct retro_game_info info = { .path = NULL, .data = bgmRom, .size = sizeof(bgmRom) };
+	struct retro_game_info info = { .path = path, .data = path ? NULL : bgmRom, .size = path ? 0 : sizeof(bgmRom) };
 	CHECK(retro_load_game(&info));
 	RealtimeBgmSetLocateOverrideForTesting(NULL);
 	retro_run(); // deferred setup
 }
 
+static void loadBgmRom(const struct RealtimeBgmM4a* stubs) {
+	loadBgmRomFrom(stubs, NULL);
+}
+
 // The test ROM with m4a stubs, its driver state written, fast-forwarding.
-static void loadActive(void) {
+static void loadActiveFrom(const char* path) {
 	static struct RealtimeBgmM4a stubs;
 	stubs = bgmStubs();
-	loadBgmRom(&stubs);
+	loadBgmRomFrom(&stubs, path);
 	CHECK(iwram != NULL);
 	put32(0x03007FF0, BGM_SOUND_INFO);
 	put32(BGM_SOUND_INFO, BGM_ID);
@@ -84,6 +92,10 @@ static void loadActive(void) {
 	put32(BGM_PLAYER + 0x34, BGM_ID);
 	retro_bgm_set_speed(4, true);
 	CHECK(retro_bgm_active());
+}
+
+static void loadActive(void) {
+	loadActiveFrom(NULL);
 }
 
 // GB, but no Pokémon engine in it.
@@ -153,6 +165,23 @@ static void unload_while_active_frees_shadows(void) {
 	CHECK(retro_bgm_status() == RETRO_BGM_NO_GAME);
 }
 
+// Loaded by path, a write into ROM (a cheat) copies main's ROM away; the
+// shadows must not be left running from what that freed.
+static void path_load_survives_rom_write(void) {
+	char path[] = "/tmp/bgm-path-XXXXXX";
+	int fd = mkstemp(path);
+	CHECK(fd >= 0 && write(fd, bgmRom, sizeof(bgmRom)) == (ssize_t) sizeof(bgmRom));
+	close(fd);
+	loadActiveFrom(path);
+	unlink(path);
+	struct mCore* core = RetroCoreForTesting();
+	core->rawWrite8(core, 0x08000100, -1, 0x55);
+	retro_run();
+	retro_bgm_run(2);
+	CHECK(RealtimeBgmLiveShadowsForTesting() == 2);
+	retro_unload_game();
+}
+
 // A frontend may deinit without unloading first.
 static void deinit_without_unload_frees_shadows(void) {
 	loadActive();
@@ -178,6 +207,7 @@ int main(void) {
 	rewind_while_active_reclones();
 	reset_while_active_hands_back();
 	unload_while_active_frees_shadows();
+	path_load_survives_rom_write();
 	deinit_without_unload_frees_shadows();
 	if (failures) {
 		fprintf(stderr, "realtime-bgm-libretro: %d failure(s)\n", failures);

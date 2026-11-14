@@ -123,7 +123,6 @@ static void* data;
 static size_t dataSize;
 static void* savedata;
 static size_t savedataSize;
-static char romPath[PATH_MAX];      // for link mode when the frontend passed a path
 
 // GXA (libretro_gxa.h): attached to every GBA main core, a pack or not.
 static struct GXA* gxa;
@@ -2162,41 +2161,6 @@ void retro_reset(void) {
 	_setupMaps(core);
 }
 
-#ifdef GEKKO
-static size_t _readRomFile(const char *path, void **buf) {
-	size_t rc;
-	long len;
-	FILE *file = fopen(path, "rb");
-
-	if (!file) {
-		goto error;
-	}
-
-	fseek(file, 0, SEEK_END);
-	len = ftell(file);
-	rewind(file);
-	*buf = anonymousMemoryMap(len);
-	if (!*buf) {
-		goto error;
-	}
-
-	if ((rc = fread(*buf, 1, len, file)) < len) {
-		goto error;
-	}
-
-	fclose(file);
-	return rc;
-
-error:
-	if (file) {
-		fclose(file);
-	}
-	mappedMemoryFree(*buf, len);
-	*buf = NULL;
-	return -1;
-}
-#endif
-
 static void _gxaDetach(void) {
 	if (!gxa) {
 		return;
@@ -2265,6 +2229,24 @@ struct mCore* RetroCoreForTesting(void) {
 	return core;
 }
 
+static bool _readRom(const char* path, void** rom, size_t* romSize) {
+	struct VFile* vf = path && path[0] ? VFileOpen(path, O_RDONLY) : NULL;
+	if (!vf) {
+		return false;
+	}
+	ssize_t size = vf->size(vf);
+	void* bytes = size > 0 ? anonymousMemoryMap(size) : NULL;
+	bool ok = bytes && vf->read(vf, bytes, size) == size;
+	vf->close(vf);
+	if (!ok) {
+		mappedMemoryFree(bytes, size);
+		return false;
+	}
+	*rom = bytes;
+	*romSize = size;
+	return true;
+}
+
 bool retro_load_game(const struct retro_game_info* game) {
 	struct VFile* rom;
 
@@ -2272,33 +2254,31 @@ bool retro_load_game(const struct retro_game_info* game) {
 		return false;
 	}
 
+	// The ROM bytes are ours from here to retro_unload_game, whichever way the
+	// frontend passed them: the BGM shadows, the link carts and the memory maps
+	// borrow them. A file mapping is the core's, and a write into ROM (a cheat,
+	// a GPIO reset) unmaps it.
 	if (game->data) {
 		data = anonymousMemoryMap(game->size);
 		dataSize = game->size;
 		memcpy(data, game->data, game->size);
-		rom = VFileFromMemory(data, game->size);
 #ifdef ENABLE_VFS
-	} else {
-#ifdef GEKKO
-		if ((dataSize = _readRomFile(game->path, &data)) == -1) {
-			return false;
-		}
-		rom = VFileFromMemory(data, dataSize);
-#else
-		data = NULL;
-		rom = VFileOpen(game->path, O_RDONLY);
-		strlcpy(romPath, game->path, sizeof(romPath));
-#endif
+	} else if (!_readRom(game->path, &data, &dataSize)) {
+		return false;
 #endif
 	}
+	rom = data ? VFileFromMemory(data, dataSize) : NULL;
 	if (!rom) {
+		mappedMemoryFree(data, dataSize);
+		data = NULL;
 		return false;
 	}
 
 	core = mCoreFindVF(rom);
 	if (!core) {
 		rom->close(rom);
-		mappedMemoryFree(data, game->size);
+		mappedMemoryFree(data, dataSize);
+		data = NULL;
 		return false;
 	}
 	mCoreInitConfig(core, NULL);
@@ -2478,7 +2458,6 @@ void retro_unload_game(void) {
 	data = 0;
 	mappedMemoryFree(savedata, savedataSize);
 	savedata = 0;
-	romPath[0] = '\0';
 }
 
 size_t retro_serialize_size(void) {
@@ -3055,31 +3034,6 @@ static int32_t _readGyroZ(struct mRotationSource* source) {
 	return gyroZ;
 }
 
-static bool _readRom(const char* path, void** rom, size_t* romSize) {
-	struct VFile* vf = path[0] ? VFileOpen(path, O_RDONLY) : NULL;
-	if (!vf) {
-		return false;
-	}
-	ssize_t size = vf->size(vf);
-	void* bytes = size > 0 ? anonymousMemoryMap(size) : NULL;
-	bool ok = bytes && vf->read(vf, bytes, size) == size;
-	vf->close(vf);
-	if (!ok) {
-		mappedMemoryFree(bytes, size);
-		return false;
-	}
-	*rom = bytes;
-	*romSize = size;
-	return true;
-}
-
-// Reads the ROM for link mode. `data` already holds it when the frontend
-// passed bytes; for a path it is read once here and then owned the same way,
-// so retro_unload_game frees it either way. It must outlive the local core.
-static bool _linkRomBytes(void) {
-	return data || _readRom(romPath, &data, &dataSize);
-}
-
 // Remote players' buffers; free only once their cores are gone.
 static void _freeLinkBuffers(void) {
 	unsigned i;
@@ -3134,9 +3088,6 @@ RETRO_API bool retro_link_begin(unsigned players, unsigned localPlayer,
 	}
 	if (deferredSetup) {
 		_doDeferredSetup();
-	}
-	if (!_linkRomBytes()) {
-		return false;
 	}
 	struct RetroLinkCart carts[RETRO_LINK_MAX_PLAYERS];
 	unsigned i;
