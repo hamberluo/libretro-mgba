@@ -2254,10 +2254,8 @@ bool retro_load_game(const struct retro_game_info* game) {
 		return false;
 	}
 
-	// The ROM bytes are ours from here to retro_unload_game, whichever way the
-	// frontend passed them: the BGM shadows, the link carts and the memory maps
-	// borrow them. A file mapping is the core's, and a write into ROM (a cheat,
-	// a GPIO reset) unmaps it.
+	// Ours until retro_unload_game, since BGM, link and memory maps borrow it:
+	// a file mapping would be unmapped by the first write into ROM.
 	if (game->data) {
 		data = anonymousMemoryMap(game->size);
 		dataSize = game->size;
