@@ -108,3 +108,6 @@ d93a5637280431e7 3b52706bfa2141f6
 b0d2f675f2fce45a 3b52706bfa2141f6
 # ROM file unmapped after the padded copy (memory only); link-compat passes.
 32527219f138632e 3b52706bfa2141f6
+# Path loads read the ROM into `data` (owned until unload): link carts get the
+# same bytes they read at link time before. link-compat passes.
+0aa714a67d6deb00 3b52706bfa2141f6
