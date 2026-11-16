@@ -84,7 +84,7 @@ int main(void) {
 	}
 	uint32_t magic = core->busRead32(core, RESULT), pass = core->busRead32(core, RESULT + 4);
 	uint32_t done = core->busRead32(core, RESULT + 8), cases = core->busRead32(core, RESULT + 12);
-	if (magic != 0x52415847 || done != 1 || cases != 8 || pass != 0xFF) {
+	if (magic != 0x52415847 || done != 1 || cases != 9 || pass != 0x1FF) {
 		printf("FAIL magic %08X done %u cases %u pass %02X after %d frames\n", magic, done, cases, pass, frame);
 		++failures;
 	}

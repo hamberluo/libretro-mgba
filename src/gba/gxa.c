@@ -20,6 +20,8 @@ enum {
 	REG_GAMEVOL = 0x0A,
 	REG_DUCK = 0x0C,
 	REG_CHANNEL0 = 0x10,
+	REG_PACKVER = 0x50,   // 16 bytes of the manifest's version, since 1.1
+	PACKVER_LEN = 16,
 };
 
 enum {
@@ -50,7 +52,7 @@ enum {
 
 #define GXA_ID 0x5847
 #define GXA_ID1 0x3141
-#define GXA_VERSION 0x0100
+#define GXA_VERSION 0x0101
 #define GXA_UNITY 256
 #define GXA_CACHE 1024   // decoded source frames per channel
 #define GXA_RING 8192    // rendered output frames
@@ -215,8 +217,13 @@ uint16_t GXARead16(struct GXA* gxa, uint32_t offset) {
 	case REG_DUCK:
 		return gxa->duck;
 	}
+	if (offset >= REG_PACKVER && offset < REG_PACKVER + PACKVER_LEN) {
+		const char* v = gxa->pack ? GXAPackVersion(gxa->pack) : "";
+		size_t i = offset - REG_PACKVER, n = strnlen(v, PACKVER_LEN);
+		return (i < n ? (uint8_t) v[i] : 0) | (i + 1 < n ? (uint8_t) v[i + 1] : 0) << 8;
+	}
 	if (offset < REG_CHANNEL0 || offset >= REG_CHANNEL0 + 0x10 * GXA_CHANNELS) {
-		return 0;   // 0x50-0x7F reserved
+		return 0;   // 0x60-0x7F reserved
 	}
 	struct GXAChannel* c = &gxa->ch[(offset - REG_CHANNEL0) >> 4];
 	switch (offset & 0xF) {

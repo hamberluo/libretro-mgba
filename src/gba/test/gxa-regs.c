@@ -73,9 +73,20 @@ static void gxa_regs_handshake(void) {
 	CHECK(core->busRead16(core, REG(2)) == 0x3141);
 	core->busWrite16(core, REG(4), 0x1234);
 	CHECK(core->busRead16(core, REG(4)) == (0x1234 ^ 0x5847));
-	CHECK(core->busRead16(core, REG(6)) == 0x0100);
+	CHECK(core->busRead16(core, REG(6)) == 0x0101);
 	CHECK(core->busRead16(core, REG(8)) == 0x0401);
 	CHECK(core->busRead32(core, REG(0)) == 0x31415847);
+	unload(core);
+}
+
+// PACKVER: the manifest's "version" ("1" in the fixture), padded with 0; all 0 without a pack
+static void gxa_regs_packver(void) {
+	struct mCore* core = load(true, true);
+	CHECK(core->busRead16(core, REG(0x50)) == '1');
+	CHECK(core->busRead16(core, REG(0x5E)) == 0);
+	unload(core);
+	core = load(true, false);
+	CHECK(core->busRead16(core, REG(0x50)) == 0);
 	unload(core);
 }
 
@@ -132,7 +143,7 @@ static void gxa_regs_gain(void) {
 	unload(core);
 }
 
-// 0x50-0x7F is reserved: past channel 3, nothing there may be read or written
+// 0x60-0x7F is reserved and PACKVER (0x50-0x5F) read-only: writes there change nothing
 static void gxa_regs_reserved(void) {
 	struct mCore* core = load(true, true);
 	core->busWrite16(core, CH(0, TRACK), 2);
@@ -143,7 +154,8 @@ static void gxa_regs_reserved(void) {
 	for (off = 0x50; off < 0x80; off += 2) {
 		core->busWrite16(core, REG(off), 3);
 	}
-	for (off = 0x50; off < 0x80; off += 2) {
+	CHECK(core->busRead16(core, REG(0x50)) == '1');   // PACKVER is read-only
+	for (off = 0x60; off < 0x80; off += 2) {
 		CHECK(core->busRead16(core, REG(off)) == 0);
 	}
 	CHECK(core->busRead16(core, CH(0, STATE)) == S_PLAYING);
@@ -155,6 +167,7 @@ int main(void) {
 	memcpy(&rom[0xAC], "GXAT", 4);
 	gxa_regs_absent();
 	gxa_regs_handshake();
+	gxa_regs_packver();
 	gxa_regs_play();
 	gxa_regs_missing();
 	gxa_regs_no_pack();
