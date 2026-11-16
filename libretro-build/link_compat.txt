@@ -111,3 +111,5 @@ b0d2f675f2fce45a 3b52706bfa2141f6
 # Path loads read the ROM into `data` (owned until unload): link carts get the
 # same bytes they read at link time before. link-compat passes.
 0aa714a67d6deb00 3b52706bfa2141f6
+# GXA 1.1 PACKVER (src/gba/gxa.c registers only, no link path). link-compat passes.
+eded5ebe92a14d2d 3b52706bfa2141f6
